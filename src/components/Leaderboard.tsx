@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { type Address, formatUnits } from 'viem';
 import { COPY_BOND_ADDRESS, getClient } from '../chain';
 import { copyBondAbi } from '../abi';
+import { ReputationPanel } from './ReputationPanel';
 
 type LeaderRow = {
   address: Address;
@@ -100,6 +101,9 @@ export function Leaderboard() {
           ))}
         </tbody>
       </table>
+      <div style={{ marginTop: '24px' }}>
+        <ReputationPanel />
+      </div>
     </div>
   );
 }
