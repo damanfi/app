@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.vite/
+
+# build artifacts
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.*
+!.env.example
+
+# logs
+*.log
+
+# system
+.DS_Store
