@@ -26,23 +26,11 @@ export function App() {
       <div className="app">
         <header className="header">
           <div className="brand">
-            <svg viewBox="0 0 32 32" className="brand-glyph" aria-hidden="true">
-              <circle
-                cx="16"
-                cy="16"
-                r="14"
-                stroke="var(--brand-1)"
-                strokeWidth="2"
-                fill="none"
-              />
-              <path
-                d="M 6 16 Q 16 4 26 16"
-                stroke="var(--brand-1)"
-                strokeWidth="2"
-                fill="none"
-                strokeLinecap="round"
-              />
-            </svg>
+            <img
+              src={`${((import.meta as any).env?.BASE_URL ?? '/')}logo-glyph.png`}
+              alt=""
+              className="brand-glyph"
+            />
             <span className="brand-text">daman</span>
           </div>
           <nav className="nav">
