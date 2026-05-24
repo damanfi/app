@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatUnits } from 'viem';
-import { COPY_BOND_ADDRESS, getClient } from '../chain';
+import { COPY_BOND_ADDRESS, COPY_BOND_DEPLOY_BLOCK, getLogsPaged } from '../chain';
 import { copyBondAbi } from '../abi';
 
 type Receipt = {
@@ -30,18 +30,16 @@ export function Receipts() {
     let cancelled = false;
     async function load() {
       try {
-        const client = getClient();
         const collected: Receipt[] = [];
         for (const name of EVENT_NAMES) {
           const eventAbi = copyBondAbi.find(
             (x) => 'name' in x && (x as any).name === name
           ) as any;
           if (!eventAbi) continue;
-          const logs = await client.getLogs({
+          const logs = await getLogsPaged({
             address: COPY_BOND_ADDRESS,
             event: eventAbi,
-            fromBlock: 0n,
-            toBlock: 'latest',
+            fromBlock: COPY_BOND_DEPLOY_BLOCK,
           });
           for (const log of logs) {
             collected.push({

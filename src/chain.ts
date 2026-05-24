@@ -1,4 +1,4 @@
-import { createPublicClient, http, type Address } from 'viem';
+import { createPublicClient, http, type Address, type AbiEvent } from 'viem';
 import { ArcTestnet } from '@circle-fin/app-kit/chains';
 
 // Chain definition sourced from Circle's App Kit. ArcTestnet ships the
@@ -15,6 +15,21 @@ const RPC_URL: string =
 
 export const COPY_BOND_ADDRESS = ((env.VITE_COPY_BOND_ADDRESS ??
   '0x0000000000000000000000000000000000000000') as Address);
+
+export const COPY_BOND_DEPLOY_BLOCK: bigint = BigInt(
+  env.VITE_COPY_BOND_DEPLOY_BLOCK ?? '0'
+);
+
+export const REPUTATION_REGISTRY_DEPLOY_BLOCK: bigint = BigInt(
+  env.VITE_REPUTATION_REGISTRY_DEPLOY_BLOCK ?? '0'
+);
+
+// Arc testnet caps eth_getLogs at 10,000 blocks per call. Other
+// providers vary; the env override lets a deployer dial this down
+// without code edits.
+export const LOGS_BLOCK_RANGE: bigint = BigInt(
+  env.VITE_LOGS_BLOCK_RANGE ?? '10000'
+);
 
 export const arcTestnet = {
   id: ArcTestnet.chainId,
@@ -38,4 +53,37 @@ function makeClient() {
 export function getClient() {
   if (!_client) _client = makeClient();
   return _client;
+}
+
+/**
+ * Paginated getLogs that respects the provider's per-call block range
+ * cap. Arc testnet rejects calls spanning more than 10,000 blocks;
+ * scanning from a deploy block to head in a single call breaks the
+ * moment the chain moves past the window. This helper walks the range
+ * in LOGS_BLOCK_RANGE-sized windows and concatenates the results.
+ */
+export async function getLogsPaged(params: {
+  address: Address;
+  event: AbiEvent;
+  fromBlock: bigint;
+  toBlock?: bigint;
+}) {
+  const client = getClient();
+  const head = params.toBlock ?? (await client.getBlockNumber());
+  const start = params.fromBlock > head ? head : params.fromBlock;
+  const all: Awaited<ReturnType<typeof client.getLogs>> = [];
+  let cursor = start;
+  while (cursor <= head) {
+    const windowEnd = cursor + LOGS_BLOCK_RANGE - 1n;
+    const end = windowEnd > head ? head : windowEnd;
+    const batch = await client.getLogs({
+      address: params.address,
+      event: params.event as any,
+      fromBlock: cursor,
+      toBlock: end,
+    });
+    for (const log of batch) all.push(log);
+    cursor = end + 1n;
+  }
+  return all;
 }

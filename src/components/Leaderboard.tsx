@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { type Address, formatUnits } from 'viem';
-import { COPY_BOND_ADDRESS, getClient } from '../chain';
+import { COPY_BOND_ADDRESS, COPY_BOND_DEPLOY_BLOCK, getClient, getLogsPaged } from '../chain';
 import { copyBondAbi } from '../abi';
 import { ReputationPanel } from './ReputationPanel';
 
@@ -25,11 +25,10 @@ export function Leaderboard() {
       try {
         const client = getClient();
         // Pull all LeaderRegistered events to discover the leader set.
-        const logs = await client.getLogs({
+        const logs = await getLogsPaged({
           address: COPY_BOND_ADDRESS,
           event: copyBondAbi.find((x) => 'name' in x && x.name === 'LeaderRegistered') as any,
-          fromBlock: 0n,
-          toBlock: 'latest',
+          fromBlock: COPY_BOND_DEPLOY_BLOCK,
         });
         const seen = new Set<Address>();
         for (const log of logs) {

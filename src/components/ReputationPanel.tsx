@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { type Address } from 'viem';
-import { getClient } from '../chain';
+import { getClient, getLogsPaged, REPUTATION_REGISTRY_DEPLOY_BLOCK } from '../chain';
 
 /**
  * Watchdog Reputation panel.
@@ -83,11 +83,10 @@ export function ReputationPanel() {
           (x) => 'name' in x && x.name === 'ReputationUpdated'
         ) as any;
 
-        const logs = await client.getLogs({
+        const logs = await getLogsPaged({
           address: REPUTATION_REGISTRY_ADDRESS,
           event: updatedEvent,
-          fromBlock: 0n,
-          toBlock: 'latest',
+          fromBlock: REPUTATION_REGISTRY_DEPLOY_BLOCK,
         });
 
         const seen = new Set<string>();
