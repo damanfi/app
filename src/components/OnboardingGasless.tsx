@@ -41,8 +41,11 @@ export function OnboardingGasless() {
       return;
     }
     if (!gaslessReady()) {
+      console.warn(
+        '[daman] gasless flow unavailable: bundler URL or paymaster address is unset'
+      );
       setStatus(
-        'gasless flow is not configured. set VITE_PIMLICO_BUNDLER_URL and VITE_CIRCLE_PAYMASTER_ADDRESS, or use the non-gasless onboarding tab.'
+        'gasless flow temporarily unavailable. switch to the subscribe tab to continue.'
       );
       return;
     }
@@ -172,8 +175,7 @@ export function OnboardingGasless() {
       {status && <div className="status">{status}</div>}
       {!gaslessReady() && (
         <div className="status">
-          gasless flow is unconfigured. the operator can set VITE_PIMLICO_BUNDLER_URL and
-          VITE_CIRCLE_PAYMASTER_ADDRESS to enable; otherwise use the standard "subscribe" tab.
+          gasless flow temporarily unavailable. switch to the subscribe tab to continue.
         </div>
       )}
     </div>

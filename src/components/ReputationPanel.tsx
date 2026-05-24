@@ -157,9 +157,8 @@ export function ReputationPanel() {
       <div className="panel">
         <h2>watchdog reputation</h2>
         <p className="muted">
-          ReputationRegistry not yet wired. Set VITE_REPUTATION_REGISTRY to the deployed
-          address; the panel reads `reputationScore(address)` and renders top-10 watchdogs by
-          score on each load.
+          reputation data is loading. if this persists, the registry may be temporarily
+          unreachable.
         </p>
       </div>
     );

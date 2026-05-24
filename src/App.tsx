@@ -4,6 +4,7 @@ import { Onboarding } from './components/Onboarding';
 import { OnboardingGasless } from './components/OnboardingGasless';
 import { UnifiedBalance } from './components/UnifiedBalance';
 import { Receipts } from './components/Receipts';
+import { Hero } from './components/Hero';
 
 type Tab = 'leaderboard' | 'onboarding' | 'gasless' | 'balance' | 'receipts';
 
@@ -24,7 +25,26 @@ export function App() {
     <AppKitShell>
       <div className="app">
         <header className="header">
-          <div className="brand">daman</div>
+          <div className="brand">
+            <svg viewBox="0 0 32 32" className="brand-glyph" aria-hidden="true">
+              <circle
+                cx="16"
+                cy="16"
+                r="14"
+                stroke="var(--brand-1)"
+                strokeWidth="2"
+                fill="none"
+              />
+              <path
+                d="M 6 16 Q 16 4 26 16"
+                stroke="var(--brand-1)"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="brand-text">daman</span>
+          </div>
           <nav className="nav">
             <button
               className={tab === 'leaderboard' ? 'active' : ''}
@@ -58,6 +78,7 @@ export function App() {
             </button>
           </nav>
         </header>
+        <Hero />
         <main className="main">
           {tab === 'leaderboard' && <Leaderboard />}
           {tab === 'onboarding' && <Onboarding />}

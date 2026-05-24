@@ -8,6 +8,8 @@ type Receipt = {
   txHash: string;
   event: string;
   detail: string;
+  variant: 'brand' | 'warning' | 'danger' | 'success' | 'info' | 'deep';
+  args: any;
 };
 
 const EVENT_NAMES = [
@@ -20,6 +22,29 @@ const EVENT_NAMES = [
   'ArbiterRuled',
   'BondSlashed',
 ];
+
+function variantFor(event: string, args: any): Receipt['variant'] {
+  switch (event) {
+    case 'LeaderRegistered':
+      return 'brand';
+    case 'LeaderBondPosted':
+      return 'brand';
+    case 'FollowerSubscribed':
+      return 'info';
+    case 'TradeExecuted':
+      return 'deep';
+    case 'SettlementCompleted':
+      return 'deep';
+    case 'DegradationFlagged':
+      return 'warning';
+    case 'ArbiterRuled':
+      return args?.upheld ? 'danger' : 'success';
+    case 'BondSlashed':
+      return 'danger';
+    default:
+      return 'brand';
+  }
+}
 
 export function Receipts() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -42,11 +67,14 @@ export function Receipts() {
             fromBlock: COPY_BOND_DEPLOY_BLOCK,
           });
           for (const log of logs) {
+            const args = (log as any).args;
             collected.push({
               blockNumber: log.blockNumber ?? 0n,
               txHash: log.transactionHash ?? '',
               event: name,
-              detail: summarize(name, (log as any).args),
+              detail: summarize(name, args),
+              variant: variantFor(name, args),
+              args,
             });
           }
         }
@@ -64,57 +92,71 @@ export function Receipts() {
     };
   }, []);
 
-  if (loading) return <div className="panel">loading receipts...</div>;
-  if (error) return <div className="panel error">rpc unavailable: {error}</div>;
+  if (loading) return <div className="panel">loading receipts…</div>;
+  if (error) return <div className="panel error">{error}</div>;
   if (receipts.length === 0)
-    return <div className="panel">no on-chain events yet for this deployment.</div>;
+    return (
+      <div className="panel">
+        <h2>receipts</h2>
+        <div className="empty">
+          <div className="empty-headline">no on-chain activity yet.</div>
+          <div className="empty-detail">
+            once leaders bond, followers subscribe, or watchdogs file claims, every event
+            renders here as a receipt with the corresponding transaction hash.
+          </div>
+        </div>
+      </div>
+    );
 
   return (
-    <div className="panel">
-      <h2>on-chain receipts</h2>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>block</th>
-            <th>event</th>
-            <th>detail</th>
-            <th>tx</th>
-          </tr>
-        </thead>
-        <tbody>
-          {receipts.map((r, i) => (
-            <tr key={`${r.txHash}-${i}`}>
-              <td className="mono">{r.blockNumber.toString()}</td>
-              <td>{r.event}</td>
-              <td className="detail">{r.detail}</td>
-              <td className="mono">{r.txHash.slice(0, 10)}...</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div>
+      <h2 style={{ marginBottom: 'var(--space-4)' }}>receipts</h2>
+      {receipts.map((r, i) => (
+        <article key={`${r.txHash}-${i}`} className={`receipt ${r.variant}`}>
+          <header className="receipt-header">
+            <span className="receipt-type">{prettify(r.event)}</span>
+            <span className="receipt-block">block {r.blockNumber.toString()}</span>
+          </header>
+          <div className="receipt-body">{r.detail}</div>
+          <a
+            className="receipt-tx"
+            href={`https://testnet.arcscan.app/tx/${r.txHash}`}
+            target="_blank"
+            rel="noreferrer"
+            title={r.txHash}
+          >
+            {r.txHash.slice(0, 10)}…{r.txHash.slice(-6)}
+          </a>
+        </article>
+      ))}
     </div>
   );
+}
+
+function prettify(event: string) {
+  // CamelCase → spaced
+  return event.replace(/([A-Z])/g, ' $1').trim();
 }
 
 function summarize(event: string, args: any): string {
   if (!args) return '';
   switch (event) {
     case 'LeaderRegistered':
-      return `leader=${shortAddr(args.leader)} tier=${args.tier} aum=${fmtUsd(args.claimedAum)}`;
+      return `leader ${shortAddr(args.leader)} registered, tier ${args.tier}, claimed AUM ${fmtUsd(args.claimedAum)} USDC`;
     case 'LeaderBondPosted':
-      return `leader=${shortAddr(args.leader)} amount=${fmtUsd(args.amount)} total=${fmtUsd(args.totalBond)}`;
+      return `leader ${shortAddr(args.leader)} posted ${fmtUsd(args.amount)} USDC, total bond ${fmtUsd(args.totalBond)} USDC`;
     case 'FollowerSubscribed':
-      return `follower=${shortAddr(args.follower)} -> ${shortAddr(args.leader)} capital=${fmtUsd(args.capital)}`;
+      return `follower ${shortAddr(args.follower)} subscribed to ${shortAddr(args.leader)} with ${fmtUsd(args.capital)} USDC`;
     case 'TradeExecuted':
-      return `leader=${shortAddr(args.leader)} asset=${shortAddr(args.asset)} amount=${fmtUsd(args.amount)}`;
+      return `leader ${shortAddr(args.leader)} executed ${args.isLong ? 'long' : 'short'} on ${shortAddr(args.asset)} for ${fmtUsd(args.amount)} USDC`;
     case 'SettlementCompleted':
-      return `leader=${shortAddr(args.leader)} pnl=${args.pnl?.toString?.() ?? args.pnl}`;
+      return `leader ${shortAddr(args.leader)} settled, pnl ${args.pnl?.toString?.() ?? args.pnl}`;
     case 'DegradationFlagged':
-      return `claim=${args.claimId} leader=${shortAddr(args.leader)} watchdog=${shortAddr(args.watchdog)}`;
+      return `watchdog ${shortAddr(args.watchdog)} flagged claim ${args.claimId} against ${shortAddr(args.leader)}`;
     case 'ArbiterRuled':
-      return `claim=${args.claimId} slash=${fmtUsd(args.slashAmount)} upheld=${args.upheld}`;
+      return `claim ${args.claimId} ${args.upheld ? 'upheld' : 'rejected'}, slash ${fmtUsd(args.slashAmount)} USDC`;
     case 'BondSlashed':
-      return `leader=${shortAddr(args.leader)} amount=${fmtUsd(args.amount)} claim=${args.claimId}`;
+      return `leader ${shortAddr(args.leader)} slashed ${fmtUsd(args.amount)} USDC under claim ${args.claimId}`;
     default:
       return '';
   }
@@ -123,13 +165,17 @@ function summarize(event: string, args: any): string {
 function shortAddr(a: any) {
   if (!a) return '';
   const s = String(a);
-  return `${s.slice(0, 6)}...${s.slice(-4)}`;
+  return `${s.slice(0, 6)}…${s.slice(-4)}`;
 }
 
 function fmtUsd(n: any) {
   if (n === undefined || n === null) return '';
   try {
-    return formatUnits(typeof n === 'bigint' ? n : BigInt(n), 18);
+    const s = formatUnits(typeof n === 'bigint' ? n : BigInt(n), 18);
+    if (!s.includes('.')) return s;
+    const [whole, frac] = s.split('.');
+    const trimmed = frac.replace(/0+$/, '').slice(0, 2);
+    return trimmed.length > 0 ? `${whole}.${trimmed}` : whole;
   } catch {
     return String(n);
   }
