@@ -161,7 +161,7 @@ export function UnifiedBalance() {
           <p className="muted">
             total: <span className="mono">{totalDisplay} USDC</span>, fundable to Arc in &lt;500ms.
           </p>
-          <button type="button" onClick={materializeOnArc}>
+          <button type="button" className="btn-primary" onClick={materializeOnArc}>
             materialize on Arc
           </button>
         </>
