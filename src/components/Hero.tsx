@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { type Address, formatUnits } from 'viem';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import {
   COPY_BOND_ADDRESS,
   COPY_BOND_DEPLOY_BLOCK,
@@ -128,15 +129,19 @@ export function Hero() {
     <section className="hero">
       <div className="hero-line">
         <h1 className="hero-headline">Slash-bonded copy-trading on hum.</h1>
-        <a
-          className="hero-addr"
-          href={explorerUrl}
-          target="_blank"
-          rel="noreferrer"
-          title={COPY_BOND_ADDRESS}
-        >
-          {short(COPY_BOND_ADDRESS)}
-        </a>
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild>
+            <a className="hero-addr" href={explorerUrl} target="_blank" rel="noreferrer">
+              {short(COPY_BOND_ADDRESS)}
+            </a>
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content className="tt-content" sideOffset={6}>
+              {COPY_BOND_ADDRESS} (arcscan)
+              <Tooltip.Arrow className="tt-arrow" />
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
       </div>
       <div className="hero-metrics">
         <Metric value={trimUsd(m.tvlDisplay)} label="USDC bonded" />

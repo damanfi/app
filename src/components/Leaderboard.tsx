@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { type Address, formatUnits } from 'viem';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import {
   COPY_BOND_ADDRESS,
   COPY_BOND_DEPLOY_BLOCK,
@@ -178,14 +179,28 @@ export function Leaderboard() {
 }
 
 function AddrChip({ address }: { address: Address }) {
+  const [copied, setCopied] = useState(false);
   return (
-    <button
-      className="addr-chip"
-      title={address}
-      onClick={() => navigator.clipboard?.writeText(address)}
-    >
-      {address.slice(0, 6)}…{address.slice(-4)}
-    </button>
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>
+        <button
+          className="addr-chip"
+          onClick={() => {
+            navigator.clipboard?.writeText(address);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1200);
+          }}
+        >
+          {address.slice(0, 6)}…{address.slice(-4)}
+        </button>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content className="tt-content" sideOffset={6}>
+          {copied ? 'copied' : address}
+          <Tooltip.Arrow className="tt-arrow" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 

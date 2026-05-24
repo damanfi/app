@@ -65,7 +65,8 @@ a:hover {
   gap: var(--space-5);
 }
 
-.nav button {
+.nav button,
+.nav [role='tab'] {
   background: transparent;
   border: none;
   padding: var(--space-2) 0;
@@ -78,13 +79,46 @@ a:hover {
   transition: color 120ms ease, border-color 120ms ease;
 }
 
-.nav button:hover {
+.nav button:hover,
+.nav [role='tab']:hover {
   color: var(--fg-1);
 }
 
-.nav button.active {
+.nav button.active,
+.nav [role='tab'][data-state='active'] {
   color: var(--brand-1);
   border-bottom-color: var(--brand-1);
+}
+
+/* radix tooltip */
+
+.tt-content {
+  background: var(--bg-2);
+  color: var(--fg-1);
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  user-select: none;
+  animation: tt-in 160ms ease-out;
+  z-index: 50;
+}
+
+.tt-arrow {
+  fill: var(--bg-2);
+}
+
+@keyframes tt-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .main {

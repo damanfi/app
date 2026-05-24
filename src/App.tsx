@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react';
+import * as Tabs from '@radix-ui/react-tabs';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { Leaderboard } from './components/Leaderboard';
 import { Onboarding } from './components/Onboarding';
 import { OnboardingGasless } from './components/OnboardingGasless';
@@ -7,6 +9,14 @@ import { Receipts } from './components/Receipts';
 import { Hero } from './components/Hero';
 
 type Tab = 'leaderboard' | 'onboarding' | 'gasless' | 'balance' | 'receipts';
+
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'leaderboard', label: 'leaderboard' },
+  { value: 'onboarding', label: 'subscribe' },
+  { value: 'gasless', label: 'gasless' },
+  { value: 'balance', label: 'balance' },
+  { value: 'receipts', label: 'receipts' },
+];
 
 /**
  * App root.
@@ -20,66 +30,56 @@ type Tab = 'leaderboard' | 'onboarding' | 'gasless' | 'balance' | 'receipts';
  */
 export function App() {
   const [tab, setTab] = useState<Tab>('leaderboard');
+  const logoSrc = `${((import.meta as any).env?.BASE_URL ?? '/')}logo-glyph.png`;
 
   return (
-    <AppKitShell>
-      <div className="app">
-        <header className="header">
-          <div className="brand">
-            <img
-              src={`${((import.meta as any).env?.BASE_URL ?? '/')}logo-glyph.png`}
-              alt=""
-              className="brand-glyph"
-            />
-            <span className="brand-text">daman</span>
-          </div>
-          <nav className="nav">
-            <button
-              className={tab === 'leaderboard' ? 'active' : ''}
-              onClick={() => setTab('leaderboard')}
+    <Tooltip.Provider delayDuration={300}>
+      <AppKitShell>
+        <div className="app">
+          <header className="header">
+            <Tooltip.Root>
+              <Tooltip.Trigger asChild>
+                <div className="brand">
+                  <img src={logoSrc} alt="" className="brand-glyph" />
+                  <span className="brand-text">daman</span>
+                </div>
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content className="tt-content" sideOffset={6}>
+                  Slash-bonded copy-trading on hum.
+                  <Tooltip.Arrow className="tt-arrow" />
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+            <Tabs.Root
+              value={tab}
+              onValueChange={(v) => setTab(v as Tab)}
+              activationMode="automatic"
             >
-              leaderboard
-            </button>
-            <button
-              className={tab === 'onboarding' ? 'active' : ''}
-              onClick={() => setTab('onboarding')}
-            >
-              subscribe
-            </button>
-            <button
-              className={tab === 'gasless' ? 'active' : ''}
-              onClick={() => setTab('gasless')}
-            >
-              gasless
-            </button>
-            <button
-              className={tab === 'balance' ? 'active' : ''}
-              onClick={() => setTab('balance')}
-            >
-              balance
-            </button>
-            <button
-              className={tab === 'receipts' ? 'active' : ''}
-              onClick={() => setTab('receipts')}
-            >
-              receipts
-            </button>
-          </nav>
-        </header>
-        <Hero />
-        <main className="main">
-          {tab === 'leaderboard' && <Leaderboard />}
-          {tab === 'onboarding' && <Onboarding />}
-          {tab === 'gasless' && <OnboardingGasless />}
-          {tab === 'balance' && <UnifiedBalance />}
-          {tab === 'receipts' && <Receipts />}
-        </main>
-        <footer className="footer">
-          slash-bonded copy-trading on hum. open standard at{' '}
-          <a href="https://github.com/damanfi/protocol">damanfi/protocol</a>.
-        </footer>
-      </div>
-    </AppKitShell>
+              <Tabs.List className="nav">
+                {TABS.map((t) => (
+                  <Tabs.Trigger key={t.value} value={t.value}>
+                    {t.label}
+                  </Tabs.Trigger>
+                ))}
+              </Tabs.List>
+            </Tabs.Root>
+          </header>
+          <Hero />
+          <main className="main">
+            {tab === 'leaderboard' && <Leaderboard />}
+            {tab === 'onboarding' && <Onboarding />}
+            {tab === 'gasless' && <OnboardingGasless />}
+            {tab === 'balance' && <UnifiedBalance />}
+            {tab === 'receipts' && <Receipts />}
+          </main>
+          <footer className="footer">
+            slash-bonded copy-trading on hum. open standard at{' '}
+            <a href="https://github.com/damanfi/protocol">damanfi/protocol</a>.
+          </footer>
+        </div>
+      </AppKitShell>
+    </Tooltip.Provider>
   );
 }
 
