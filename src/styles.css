@@ -10,6 +10,29 @@ body {
   background: var(--bg-0);
   color: var(--fg-1);
   font-feature-settings: 'cv11', 'ss01';
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Ambient gradient field. The glass surfaces blur this. Two soft
+ * amber radials at opposite corners create depth without busy noise. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(60% 50% at 15% 10%, rgba(255, 179, 0, 0.18) 0%, transparent 60%),
+    radial-gradient(50% 50% at 90% 100%, rgba(184, 123, 0, 0.14) 0%, transparent 65%),
+    radial-gradient(40% 40% at 80% 20%, rgba(96, 165, 250, 0.06) 0%, transparent 65%);
+}
+
+/* Let the body gradient show through the radix Theme root. */
+.radix-themes {
+  background-color: transparent !important;
+  --color-background: transparent;
 }
 
 a {
@@ -93,21 +116,23 @@ a:hover {
 /* radix tooltip */
 
 .tt-content {
-  background: var(--bg-2);
+  background: rgba(28, 28, 36, 0.85);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
   color: var(--fg-1);
   font-family: var(--font-body);
   font-size: 12px;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-1);
+  border: 1px solid var(--glass-border-strong);
   border-radius: var(--radius-sm);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   user-select: none;
   animation: tt-in 160ms ease-out;
   z-index: 50;
 }
 
 .tt-arrow {
-  fill: var(--bg-2);
+  fill: rgba(28, 28, 36, 0.85);
 }
 
 @keyframes tt-in {
@@ -128,11 +153,24 @@ a:hover {
 /* hero */
 
 .hero {
-  background: var(--bg-1);
-  border: 1px solid var(--border-1);
+  background: var(--glass-1);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-strong);
   border-radius: var(--radius-lg);
   padding: var(--space-6) var(--space-7);
   margin-bottom: var(--space-6);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 179, 0, 0.05) 0%, transparent 50%);
 }
 
 .hero-line {
@@ -155,17 +193,19 @@ a:hover {
 .hero-addr {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--fg-3);
-  background: var(--bg-2);
+  color: var(--fg-2);
+  background: rgba(28, 28, 36, 0.5);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-1);
+  border: 1px solid var(--glass-border);
   transition: color 120ms ease, border-color 120ms ease;
 }
 
 .hero-addr:hover {
   color: var(--brand-1);
-  border-color: var(--brand-3);
+  border-color: var(--glass-border-strong);
 }
 
 .hero-metrics {
@@ -201,10 +241,13 @@ a:hover {
 
 .panel,
 .card {
-  background: var(--bg-1);
-  border: 1px solid var(--border-1);
+  background: var(--glass-1);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: var(--space-5) var(--space-5);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .panel h2,
@@ -381,13 +424,20 @@ a:hover {
 /* receipt cards */
 
 .receipt {
-  background: var(--bg-1);
-  border: 1px solid var(--border-1);
+  background: var(--glass-1);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   border-left: 3px solid var(--brand-1);
   border-radius: var(--radius-md);
   padding: var(--space-4) var(--space-5);
   margin-bottom: var(--space-3);
-  transition: border-color 120ms ease;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.receipt:hover {
+  transform: translateY(-1px);
 }
 
 .receipt.brand { border-left-color: var(--brand-1); }
@@ -554,8 +604,10 @@ a:hover {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--fg-2);
-  background: var(--bg-2);
-  border: 1px solid var(--border-1);
+  background: rgba(28, 28, 36, 0.5);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
   padding: 2px var(--space-2);
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -564,7 +616,7 @@ a:hover {
 
 .addr-chip:hover {
   color: var(--brand-1);
-  border-color: var(--brand-3);
+  border-color: var(--glass-border-strong);
 }
 
 /* pulse */

@@ -16,6 +16,14 @@
   --border-1: #2a2a35;
   --border-2: #3a3a48;
 
+  /* glass surfaces */
+  --glass-1: rgba(19, 19, 24, 0.55);
+  --glass-2: rgba(28, 28, 36, 0.55);
+  --glass-3: rgba(37, 37, 46, 0.55);
+  --glass-border: rgba(255, 179, 0, 0.10);
+  --glass-border-strong: rgba(255, 179, 0, 0.22);
+  --glass-blur: blur(14px) saturate(140%);
+
   /* text */
   --fg-1: #e8e8e3;
   --fg-2: #c8c8c0;
