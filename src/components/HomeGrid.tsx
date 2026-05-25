@@ -30,6 +30,7 @@ import {
   resolveHomeWindow,
   TIME_WINDOW_CHIPS,
   TIME_WINDOW_LABELS,
+  getHeadBlock,
   type TimeWindowId,
 } from '../lib/homeWindow';
 import {
@@ -61,6 +62,45 @@ const LEADER_ROLE = keccak256(toBytes('leader'));
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const TIER_LABEL = ['retail', 'mid', 'institutional'];
 
+// Head-block poll cadence. 12s matches arc-testnet's nominal block
+// production with a small safety margin so the badge updates roughly
+// once per block without hammering the blockscout stats endpoint.
+const LIVE_POLL_MS = 12_000;
+
+type LiveBlock = {
+  head: number | null;
+  fetchedAt: number;
+};
+
+// Polls blockscout's stats endpoint for the head block on a fixed
+// cadence. The badge re-renders every poll regardless of whether the
+// value moved so the freshness signal stays meaningful even when the
+// chain is between blocks.
+function useLiveBlock(): LiveBlock {
+  const [state, setState] = useState<LiveBlock>({ head: null, fetchedAt: 0 });
+  useEffect(() => {
+    let cancelled = false;
+    let timer: number | null = null;
+    const tick = async () => {
+      try {
+        const head = await getHeadBlock();
+        if (!cancelled) setState({ head, fetchedAt: Date.now() });
+      } catch {
+        if (!cancelled) setState((s) => ({ ...s, fetchedAt: Date.now() }));
+      }
+      if (!cancelled) {
+        timer = window.setTimeout(tick, LIVE_POLL_MS);
+      }
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, []);
+  return state;
+}
+
 const agentRegisteredAbi = {
   type: 'event',
   name: 'AgentRegistered',
@@ -90,6 +130,7 @@ export function HomeGrid() {
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(true);
   const [focus, setFocus] = useState<BeeFocus | null>(null);
+  const liveBlock = useLiveBlock();
 
   // (1) Time-windowed event index. Refetches on chip change.
   useEffect(() => {
@@ -316,6 +357,12 @@ export function HomeGrid() {
         windowId={windowId}
         onChange={setWindowId}
         loading={loadingIndex}
+        liveBlock={liveBlock}
+        latestEventBlock={
+          index && index.events.length > 0
+            ? index.events[index.events.length - 1].block
+            : null
+        }
       />
       <StatsStrip
         index={index}
@@ -363,16 +410,21 @@ function ChipStrip({
   windowId,
   onChange,
   loading,
+  liveBlock,
+  latestEventBlock,
 }: {
   windowId: TimeWindowId;
   onChange: (id: TimeWindowId) => void;
   loading: boolean;
+  liveBlock: LiveBlock;
+  latestEventBlock: number | null;
 }) {
   return (
     <div className="home-chiprow">
       <div className="home-chiprow-label">
         window <span className="home-chiprow-sub">{TIME_WINDOW_LABELS[windowId]}</span>
         {loading && <span className="home-chiprow-dot">indexing…</span>}
+        <LiveBadge live={liveBlock} latestEventBlock={latestEventBlock} />
       </div>
       <div className="home-chips">
         {CHIPS.map((c) => (
@@ -388,6 +440,46 @@ function ChipStrip({
         ))}
       </div>
     </div>
+  );
+}
+
+// Renders the head-block badge to the right of the window label. Shows
+// "live" with a pulsing dot once the first head fetch lands; the title
+// attribute carries the source-of-truth label so hover gives a tighter
+// read without crowding the strip.
+function LiveBadge({
+  live,
+  latestEventBlock,
+}: {
+  live: LiveBlock;
+  latestEventBlock: number | null;
+}) {
+  if (live.head === null) {
+    return (
+      <span className="home-chiprow-live home-chiprow-live-pending">
+        connecting…
+      </span>
+    );
+  }
+  const lag =
+    latestEventBlock !== null && latestEventBlock > 0
+      ? live.head - latestEventBlock
+      : null;
+  const title =
+    latestEventBlock !== null && latestEventBlock > 0
+      ? `head #${live.head.toLocaleString()}, latest indexed event @ #${latestEventBlock.toLocaleString()} (${lag} block${lag === 1 ? '' : 's'} behind)`
+      : `head #${live.head.toLocaleString()}`;
+  return (
+    <span className="home-chiprow-live" title={title}>
+      <span className="home-chiprow-live-dot" />
+      live · #{live.head.toLocaleString()}
+      {lag !== null && lag > 0 && (
+        <span className="home-chiprow-live-lag">
+          {' '}
+          · {lag} behind
+        </span>
+      )}
+    </span>
   );
 }
 

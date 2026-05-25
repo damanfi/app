@@ -52,6 +52,40 @@
   animation: home-pulse 1.2s ease-in-out infinite;
 }
 
+/* live head-block badge. Sits inline with the window label; the dot
+ * pulses to signal the poll is alive, the lag annotation shows how far
+ * the indexed window trails the chain tip. */
+
+.home-chiprow-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-2);
+  text-transform: none;
+  letter-spacing: 0.04em;
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--border-1);
+}
+
+.home-chiprow-live-pending {
+  color: var(--fg-3);
+}
+
+.home-chiprow-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+  animation: home-pulse 1.6s ease-in-out infinite;
+}
+
+.home-chiprow-live-lag {
+  color: var(--warning);
+}
+
 @keyframes home-pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
