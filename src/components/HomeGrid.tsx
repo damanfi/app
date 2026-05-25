@@ -15,6 +15,7 @@
 // slowest contract's pagination loop.
 
 import { useEffect, useMemo, useState } from 'react';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { formatUnits, keccak256, toBytes, type Address } from 'viem';
 import { BEE_NAMES } from '../cinematic-window';
 import {
@@ -41,6 +42,16 @@ import {
   getLogsPaged,
 } from '../chain';
 import { copyBondAbi } from '../abi';
+import {
+  decodeRole,
+  fetchAgentRoster,
+  groupRosterByRole,
+  REGISTRY_ROLE_LABELS,
+  REGISTRY_ROLE_ORDER,
+  REGISTRY_ROLE_SINGULAR,
+  type RegistryRole,
+  type RosterEntry,
+} from '../lib/agentRoster';
 
 const CHIPS: TimeWindowId[] = ['1h', '24h', '7d', 'all'];
 const DEFAULT_WINDOW: TimeWindowId = 'all';
@@ -75,6 +86,8 @@ export function HomeGrid() {
   const [loadingIndex, setLoadingIndex] = useState(true);
   const [leaders, setLeaders] = useState<LeaderRow[]>([]);
   const [loadingLeaders, setLoadingLeaders] = useState(true);
+  const [roster, setRoster] = useState<RosterEntry[]>([]);
+  const [loadingRoster, setLoadingRoster] = useState(true);
 
   // (1) Time-windowed event index. Refetches on chip change.
   useEffect(() => {
@@ -205,6 +218,27 @@ export function HomeGrid() {
     };
   }, []);
 
+  // (3) Full agent-registry roster. Chain truth, independent of the time
+  // chip. Every bee that ever booted appears here grouped by role; the
+  // window-overlay only marks who showed activity in the selected slice.
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRoster(true);
+    (async () => {
+      try {
+        const entries = await fetchAgentRoster();
+        if (!cancelled) setRoster(entries);
+      } catch {
+        if (!cancelled) setRoster([]);
+      } finally {
+        if (!cancelled) setLoadingRoster(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Decorate leaders with window-bounded activity (trade count, in-window
   // flag, registration block when registration happened inside the
   // window) once the index lands.
@@ -240,6 +274,30 @@ export function HomeGrid() {
     });
   }, [leaders, index]);
 
+  // Per-address window activity map. Counts tx-hashes the address appears
+  // in inside the selected window, so the participants panel can mark
+  // which roster members were active vs idle in scope.
+  const activityByAddress = useMemo(() => {
+    const m = new Map<string, number>();
+    if (!index) return m;
+    const txByAddr = new Map<string, Set<string>>();
+    for (const ev of index.events) {
+      for (const v of Object.values(ev.params)) {
+        if (!/^0x[0-9a-fA-F]{40}$/.test(v)) continue;
+        const k = v.toLowerCase();
+        if (!txByAddr.has(k)) txByAddr.set(k, new Set());
+        txByAddr.get(k)!.add(ev.tx_hash);
+      }
+      if (ev.from && /^0x[0-9a-fA-F]{40}$/.test(ev.from)) {
+        const k = ev.from.toLowerCase();
+        if (!txByAddr.has(k)) txByAddr.set(k, new Set());
+        txByAddr.get(k)!.add(ev.tx_hash);
+      }
+    }
+    for (const [k, s] of txByAddr) m.set(k, s.size);
+    return m;
+  }, [index]);
+
   return (
     <section className="home">
       <ChipStrip
@@ -251,7 +309,8 @@ export function HomeGrid() {
         index={index}
         windowId={windowId}
         loading={loadingIndex}
-        leaderCount={decoratedLeaders.length}
+        rosterCount={roster.length}
+        loadingRoster={loadingRoster}
       />
       <div className="home-grid">
         <LeadersPanel
@@ -261,6 +320,12 @@ export function HomeGrid() {
         />
         <DisputesPanel index={index} loading={loadingIndex} />
         <CreditPanel index={index} loading={loadingIndex} />
+        <ParticipantsPanel
+          roster={roster}
+          loading={loadingRoster}
+          activity={activityByAddress}
+          windowId={windowId}
+        />
         <ActivityFeed index={index} loading={loadingIndex} />
       </div>
     </section>
@@ -309,20 +374,19 @@ function StatsStrip({
   index,
   windowId,
   loading,
-  leaderCount,
+  rosterCount,
+  loadingRoster,
 }: {
   index: EventIndex | null;
   windowId: TimeWindowId;
   loading: boolean;
-  leaderCount: number;
+  rosterCount: number;
+  loadingRoster: boolean;
 }) {
   const stats = useMemo(() => {
     if (!index) return null;
     const agg = computeAggregateStats(index.events);
     const txs = new Set(index.events.map((e) => e.tx_hash)).size;
-    // Active = agents that emitted at least one event in window (more
-    // truthful than relying on a per-agent "active" boolean which only
-    // tracks whether they're bonded right now).
     const active = index.participants.size;
     return {
       active,
@@ -333,37 +397,45 @@ function StatsStrip({
     };
   }, [index]);
 
+  const windowLabel = TIME_WINDOW_LABELS[windowId];
+
   return (
     <div className="home-stats">
       <Stat
-        value={leaderCount.toString()}
-        label="leaders registered"
-        muted={false}
+        value={loadingRoster ? '·' : rosterCount.toString()}
+        label="agents on chain"
+        muted={loadingRoster}
+        tip="Distinct addresses ever registered on DamanAgentRegistry. Source event: AgentRegistered(agent, role)."
       />
       <Stat
         value={stats ? stats.active.toString() : loading ? '·' : '0'}
-        label={`active in ${TIME_WINDOW_LABELS[windowId]}`}
+        label={`active in ${windowLabel}`}
         muted={loading}
+        tip={`Addresses that appear as a topic or param in any indexed event within ${windowLabel}. Includes leaders, followers, watchdogs, arbiters, relief, and operators.`}
       />
       <Stat
         value={stats ? stats.txs.toString() : loading ? '·' : '0'}
-        label="transactions"
+        label={`txs in ${TIME_WINDOW_CHIPS[windowId]}`}
         muted={loading}
+        tip="Distinct transaction hashes carrying at least one event from an indexed protocol contract in the selected window."
       />
       <Stat
         value={stats ? `${stats.usdc} USDC` : loading ? '·' : '0 USDC'}
-        label="USDC moved"
+        label="USDC across protocol"
         muted={loading}
+        tip="Sum of USDC value carried by every protocol value event in the window: bond posts, slashes, trades, subscriptions, loan requests, repayments, bounties, refunds, restitution. Excludes gas fees."
       />
       <Stat
         value={stats ? stats.disputes.toString() : loading ? '·' : '0'}
-        label="dispute resolutions"
+        label="disputes resolved"
         muted={loading}
+        tip="Claim chains in the window where an ArbiterRuled event landed (upheld with slash, or rejected). Source events: DegradationFlagged, ArbiterRuled, BondSlashed."
       />
       <Stat
         value={stats ? stats.cycles.toString() : loading ? '·' : '0'}
-        label="benevolence cycles"
+        label="credit cycles closed"
         muted={loading}
+        tip="Loans in the window where both disbursement and repayment landed. Source events: LoanSettled / LoanDisbursed, LoanRepaid."
       />
     </div>
   );
@@ -373,16 +445,28 @@ function Stat({
   value,
   label,
   muted,
+  tip,
 }: {
   value: string;
   label: string;
   muted: boolean;
+  tip: string;
 }) {
   return (
-    <div className={`home-stat ${muted ? 'home-stat-muted' : ''}`}>
-      <div className="home-stat-val">{value}</div>
-      <div className="home-stat-lbl">{label}</div>
-    </div>
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>
+        <div className={`home-stat ${muted ? 'home-stat-muted' : ''}`}>
+          <div className="home-stat-val">{value}</div>
+          <div className="home-stat-lbl">{label}</div>
+        </div>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content className="tt-content home-stat-tip" sideOffset={6}>
+          {tip}
+          <Tooltip.Arrow className="tt-arrow" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 
@@ -742,6 +826,117 @@ function CreditRow({ group }: { group: CreditGroup }) {
 }
 
 // -----------------------------------------------------------------------
+// participants
+//
+// Surfaces the full agent-registry roster grouped by role. Reads
+// AgentRegistered events from DamanAgentRegistry across all time (chain
+// truth), then overlays the time-window event index to mark which
+// agents were active in scope. The previous home grid only surfaced
+// agents whose role hash was keccak256("leader"); watchdogs, arbiters,
+// relief, and operators were invisible. This panel restores them.
+
+function ParticipantsPanel({
+  roster,
+  loading,
+  activity,
+  windowId,
+}: {
+  roster: RosterEntry[];
+  loading: boolean;
+  activity: Map<string, number>;
+  windowId: TimeWindowId;
+}) {
+  const groups = useMemo(() => groupRosterByRole(roster), [roster]);
+  const total = roster.length;
+  return (
+    <div className="home-panel home-panel-participants">
+      <PanelHeader
+        title="participants"
+        sub={`${total} agent${total === 1 ? '' : 's'} registered`}
+      />
+      {loading && total === 0 ? (
+        <div className="home-empty">reading registry…</div>
+      ) : total === 0 ? (
+        <div className="home-empty">no agents on the registry yet.</div>
+      ) : (
+        <div className="home-roles">
+          {REGISTRY_ROLE_ORDER.map((role) => {
+            const arr = groups.get(role) ?? [];
+            if (arr.length === 0) return null;
+            return (
+              <RoleGroup
+                key={role}
+                role={role}
+                entries={arr}
+                activity={activity}
+                windowId={windowId}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoleGroup({
+  role,
+  entries,
+  activity,
+  windowId,
+}: {
+  role: RegistryRole;
+  entries: RosterEntry[];
+  activity: Map<string, number>;
+  windowId: TimeWindowId;
+}) {
+  const activeInWindow = entries.filter(
+    (e) => (activity.get(e.address.toLowerCase()) ?? 0) > 0
+  ).length;
+  return (
+    <div className={`home-role home-role-${role}`}>
+      <div className="home-role-h">
+        <span className="home-role-name">{REGISTRY_ROLE_LABELS[role]}</span>
+        <span className="home-role-count mono">
+          {activeInWindow}/{entries.length}{' '}
+          <span className="home-role-suffix">
+            active · {TIME_WINDOW_CHIPS[windowId]}
+          </span>
+        </span>
+      </div>
+      <div className="home-role-cells">
+        {entries.map((e) => (
+          <RoleCell key={e.address} entry={e} activity={activity} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RoleCell({
+  entry,
+  activity,
+}: {
+  entry: RosterEntry;
+  activity: Map<string, number>;
+}) {
+  const bee = BEE_NAMES[entry.address.toLowerCase()];
+  const txs = activity.get(entry.address.toLowerCase()) ?? 0;
+  return (
+    <a
+      className={`home-role-cell ${txs > 0 ? 'home-role-cell-active' : ''}`}
+      href={arcscanAddress(entry.address)}
+      target="_blank"
+      rel="noreferrer"
+    >
+      <span className="home-role-cell-bee">{bee ?? '·'}</span>
+      <span className="home-role-cell-addr mono">{shortAddr(entry.address)}</span>
+      <span className="home-role-cell-tx mono">{txs} tx</span>
+    </a>
+  );
+}
+
+// -----------------------------------------------------------------------
 // activity feed
 
 function ActivityFeed({
@@ -821,11 +1016,12 @@ function toActivityRow(ev: IndexedEvent): ActivityRow | null {
     };
   }
   if (n === 'AgentRegistered') {
+    const decoded = decodeRole(ev.params.role);
     return {
       ...base,
       kind: 'registered',
       actor: ev.params.agent,
-      verb: 'registered on agent registry',
+      verb: `registered as ${REGISTRY_ROLE_SINGULAR[decoded]}`,
     };
   }
   if (n === 'LeaderBondPosted') {

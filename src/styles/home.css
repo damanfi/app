@@ -145,7 +145,7 @@
 .home-grid {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   gap: var(--space-4);
 }
 
@@ -178,9 +178,14 @@
   grid-row: 2;
 }
 
-.home-panel-activity {
+.home-panel-participants {
   grid-column: 1 / span 2;
   grid-row: 3;
+}
+
+.home-panel-activity {
+  grid-column: 1 / span 2;
+  grid-row: 4;
   min-height: 240px;
 }
 
@@ -654,18 +659,141 @@
   color: var(--brand-1);
 }
 
+/* participants panel
+ *
+ * Wide bottom-row surface: every registered agent grouped by role.
+ * Cells are compact links (bee name, short addr, in-window tx count).
+ * Active-in-window cells get a soft brand border so the eye picks
+ * them out without losing the idle roster context.
+ */
+
+.home-roles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow-y: auto;
+  max-height: 460px;
+  padding-right: 4px;
+}
+
+.home-role {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.home-role-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--border-1);
+}
+
+.home-role-name {
+  font-family: var(--font-display);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--fg-2);
+}
+
+.home-role-count {
+  font-size: 11px;
+  color: var(--fg-2);
+}
+
+.home-role-suffix {
+  color: var(--fg-3);
+  letter-spacing: 0.04em;
+}
+
+.home-role-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-2);
+}
+
+.home-role-cell {
+  background: var(--glass-2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: var(--space-2);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.home-role-cell:hover {
+  border-color: var(--glass-border-strong);
+  background: var(--glass-3);
+  transform: translateY(-1px);
+}
+
+.home-role-cell-active {
+  border-color: var(--brand-3);
+  background: var(--brand-glow);
+}
+
+.home-role-cell-bee {
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--brand-1);
+  letter-spacing: 0.04em;
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.home-role-cell-addr {
+  font-size: 10px;
+  color: var(--fg-3);
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.home-role-cell-tx {
+  font-size: 10px;
+  color: var(--fg-2);
+  align-self: center;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  text-align: right;
+}
+
+.home-role-cell-active .home-role-cell-tx {
+  color: var(--brand-1);
+}
+
+/* stat tooltip (overrides the radix default width so the long-form
+ * source-event copy wraps rather than running off the viewport) */
+
+.home-stat {
+  cursor: help;
+}
+
+.home-stat-tip {
+  max-width: 320px;
+  line-height: 1.45;
+}
+
 /* responsive */
 
 @media (max-width: 1100px) {
   .home-stats { grid-template-columns: repeat(3, 1fr); }
   .home-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto;
+    grid-template-rows: auto auto auto auto auto;
   }
-  .home-panel-leaders   { grid-column: 1; grid-row: 1; }
-  .home-panel-disputes  { grid-column: 1; grid-row: 2; }
-  .home-panel-credit    { grid-column: 1; grid-row: 3; }
-  .home-panel-activity  { grid-column: 1; grid-row: 4; }
+  .home-panel-leaders      { grid-column: 1; grid-row: 1; }
+  .home-panel-disputes     { grid-column: 1; grid-row: 2; }
+  .home-panel-credit       { grid-column: 1; grid-row: 3; }
+  .home-panel-participants { grid-column: 1; grid-row: 4; }
+  .home-panel-activity     { grid-column: 1; grid-row: 5; }
 }
 
 @media (max-width: 640px) {
