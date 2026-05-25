@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatUnits } from 'viem';
+import { useWallet } from '../wallet/WalletProvider';
 import {
   ARC_GATEWAY_MINTER,
   GATEWAY_BALANCE_API,
@@ -26,26 +27,25 @@ type Balance = {
  * The Gateway Balance API is permissionless; no API key is required.
  * The attestation + signature payload comes from the Balance API
  * response when the user opts to materialize.
+ *
+ * Address is now sourced from the WalletProvider context; the form
+ * field stays editable so a user can audit a third-party balance
+ * without connecting.
  */
 export function UnifiedBalance() {
-  const [address, setAddress] = useState<string>('');
+  const { state } = useWallet();
+  const connectedAddress = state.status === 'connected' ? state.address : '';
+  const [address, setAddress] = useState<string>(connectedAddress);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mintStatus, setMintStatus] = useState<string | null>(null);
 
+  // Sync the form field with the live connected address. Lets users
+  // still type a different address to query, but defaults to theirs.
   useEffect(() => {
-    const eth = (window as any).ethereum;
-    if (!eth) {
-      return;
-    }
-    eth
-      .request({ method: 'eth_accounts' })
-      .then((accounts: string[]) => {
-        if (accounts.length > 0) setAddress(accounts[0]);
-      })
-      .catch(() => {});
-  }, []);
+    if (connectedAddress) setAddress(connectedAddress);
+  }, [connectedAddress]);
 
   async function fetchBalances() {
     if (!address) {
@@ -77,13 +77,8 @@ export function UnifiedBalance() {
   }
 
   async function materializeOnArc() {
-    if (!address) {
+    if (state.status !== 'connected') {
       setMintStatus('connect a wallet first');
-      return;
-    }
-    const eth = (window as any).ethereum;
-    if (!eth) {
-      setMintStatus('no injected wallet detected');
       return;
     }
     setMintStatus('requesting attestation from Gateway...');
@@ -95,7 +90,7 @@ export function UnifiedBalance() {
       const signature = '0x'; // placeholder; populated by Mint API
       if (attestation === '0x') {
         setMintStatus(
-          'gateway mint attestation flow is awaiting operator configuration. the gatewayMint contract call shape is ready.'
+          'gateway mint attestation flow is awaiting operator configuration. the gatewayMint contract call shape is ready.',
         );
         return;
       }
@@ -105,9 +100,11 @@ export function UnifiedBalance() {
         functionName: 'gatewayMint',
         args: [attestation as `0x${string}`, signature as `0x${string}`],
       });
-      const txHash = await eth.request({
-        method: 'eth_sendTransaction',
-        params: [{ from: address, to: ARC_GATEWAY_MINTER, data }],
+      const txHash = await state.client.sendTransaction({
+        account: state.address,
+        chain: null,
+        to: ARC_GATEWAY_MINTER,
+        data,
       });
       setMintStatus(`gatewayMint submitted: ${txHash}`);
     } catch (e: any) {

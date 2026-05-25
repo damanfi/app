@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useWallet } from '../wallet/WalletProvider';
 import {
   CIRCLE_PAYMASTER_ADDRESS,
   PIMLICO_BUNDLER_URL,
@@ -28,6 +29,7 @@ import {
  * who never trigger the gasless path.
  */
 export function OnboardingGasless() {
+  const { state, switchToArc, wrongChain } = useWallet();
   const [leader, setLeader] = useState('');
   const [capital, setCapital] = useState('');
   const [status, setStatus] = useState<string | null>(null);
@@ -49,17 +51,27 @@ export function OnboardingGasless() {
       );
       return;
     }
+    if (state.status !== 'connected') {
+      setStatus('connect a wallet to dispatch this call.');
+      return;
+    }
+    if (wrongChain) {
+      const ok = await switchToArc();
+      if (!ok) {
+        setStatus('switch to arc testnet to continue.');
+        return;
+      }
+    }
 
     setPending(true);
     try {
-      const eth = (window as any).ethereum;
+      const owner = state.address;
+      const eth = (window as unknown as { ethereum?: any }).ethereum;
       if (!eth) {
         setStatus('no injected wallet detected. install a wallet to continue.');
         setPending(false);
         return;
       }
-      const accounts: string[] = await eth.request({ method: 'eth_requestAccounts' });
-      const owner = accounts[0];
 
       // Lazy-load the heavy SDK pieces only on demand.
       const [mw, aa] = await Promise.all([

@@ -1,0 +1,227 @@
+/* Wallet header surface. Connect button, picker, connected pill, and
+ * dropdown menu. Tokens come from styles/tokens.css; spacing matches
+ * the rest of the home dashboard (glass surfaces, amber accents, mono
+ * for addresses and balances).
+ */
+
+.wallet-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 160px;
+}
+
+.wallet-connect-btn {
+  appearance: none;
+  background: var(--brand-1);
+  color: var(--bg-0);
+  border: none;
+  padding: 9px 16px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 120ms ease, transform 80ms ease, opacity 120ms ease;
+}
+
+.wallet-connect-btn:hover:not(:disabled) {
+  background: var(--brand-2);
+}
+
+.wallet-connect-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.wallet-connect-btn:disabled {
+  background: var(--bg-3);
+  color: var(--fg-4);
+  cursor: not-allowed;
+}
+
+.wallet-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: rgba(19, 19, 24, 0.95);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 30;
+}
+
+.wallet-picker-item {
+  appearance: none;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--fg-1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.wallet-picker-item:hover {
+  background: var(--glass-2);
+}
+
+.wallet-error {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--danger);
+  max-width: 240px;
+}
+
+/* connected pill */
+
+.wallet-pill {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 10px;
+  background: var(--glass-1);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: 999px;
+  color: var(--fg-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.wallet-pill:hover {
+  background: var(--glass-2);
+  border-color: var(--brand-3);
+}
+
+.wallet-pill-warn {
+  border-color: var(--warning);
+}
+
+.wallet-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+}
+
+.wallet-pill-warn .wallet-pill-dot {
+  background: var(--warning);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+}
+
+.wallet-pill-addr {
+  color: var(--fg-1);
+  letter-spacing: 0.02em;
+}
+
+.wallet-pill-bal {
+  color: var(--brand-1);
+  font-weight: 600;
+  padding: 2px 8px;
+  background: var(--brand-glow);
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.wallet-pill-warn-text {
+  color: var(--warning);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wallet-pill-caret {
+  color: var(--fg-3);
+  font-size: 10px;
+  margin-left: 2px;
+  padding-right: 4px;
+}
+
+.wallet-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 220px;
+  background: rgba(19, 19, 24, 0.96);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 30;
+}
+
+.wallet-menu-item {
+  appearance: none;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 9px 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--fg-1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.wallet-menu-item:hover {
+  background: var(--glass-2);
+  color: var(--brand-1);
+}
+
+.wallet-menu-item-primary {
+  color: var(--brand-1);
+  font-weight: 600;
+}
+
+.wallet-menu-item-danger {
+  color: var(--danger);
+}
+
+.wallet-menu-item-danger:hover {
+  background: rgba(248, 113, 113, 0.08);
+  color: var(--danger);
+}
+
+/* header layout adjustment: keep cinema link + connect button balanced */
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .wallet-pill-bal {
+    display: none;
+  }
+  .wallet-wrap {
+    min-width: 0;
+  }
+}

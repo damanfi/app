@@ -102,4 +102,17 @@ export const copyBondAbi = [
       },
     ],
   },
+  // write: subscribe a follower to a leader with `capital` USDC (atomic
+  // units, 6 decimals). Requires a prior ERC-20 approval of CopyBond
+  // for `capital` USDC; the contract pulls the funds inside.
+  {
+    type: 'function',
+    name: 'subscribe',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'leader', type: 'address' },
+      { name: 'capital', type: 'uint256' },
+    ],
+    outputs: [],
+  },
 ] as const;

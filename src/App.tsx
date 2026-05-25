@@ -9,7 +9,10 @@ import { Hero } from './components/Hero';
 import { HomeGrid } from './components/HomeGrid';
 import { ReputationPanel } from './components/ReputationPanel';
 import { CinematicRoute } from './routes/cinematic';
+import { WalletProvider } from './wallet/WalletProvider';
+import { ConnectButton } from './wallet/ConnectButton';
 import './styles/home.css';
+import './styles/wallet.css';
 
 type Tab = 'subscribe' | 'gasless' | 'balance' | 'receipts' | 'reputation';
 
@@ -69,64 +72,66 @@ export function App() {
 
   return (
     <Tooltip.Provider delayDuration={300}>
-      <AppKitShell>
-        <div className="app">
-          <header className="header">
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <div className="brand">
-                  <img src={logoSrc} alt="" className="brand-glyph" />
-                  <span className="brand-text">daman</span>
-                </div>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content className="tt-content" sideOffset={6}>
-                  Slash-bonded copy-trading on arc.
-                  <Tooltip.Arrow className="tt-arrow" />
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-            <a
-              className="header-cinema-link"
-              href={cinematicHref}
-            >
-              view as cinematic loop →
-            </a>
-          </header>
-          <Hero />
-          <HomeGrid />
-          <section className="home-secondary">
-            <div className="home-secondary-h">
-              <span className="home-secondary-h-label">actions</span>
-            </div>
-            <Tabs.Root
-              value={tab}
-              onValueChange={(v) => setTab(v as Tab)}
-              activationMode="automatic"
-            >
-              <Tabs.List className="nav">
-                {TABS.map((t) => (
-                  <Tabs.Trigger key={t.value} value={t.value}>
-                    {t.label}
-                  </Tabs.Trigger>
-                ))}
-              </Tabs.List>
-            </Tabs.Root>
-            <main className="main">
-              {tab === 'subscribe' && <Onboarding />}
-              {tab === 'gasless' && <OnboardingGasless />}
-              {tab === 'balance' && <UnifiedBalance />}
-              {tab === 'receipts' && <Receipts />}
-              {tab === 'reputation' && <ReputationPanel />}
-            </main>
-          </section>
-          <footer className="footer">
-            slash-bonded copy-trading on arc. open standard at{' '}
-            <a href="https://github.com/damanfi/protocol">damanfi/protocol</a>.{' '}
-            <a href={cinematicHref}>cinematic loop</a>.
-          </footer>
-        </div>
-      </AppKitShell>
+      <WalletProvider>
+        <AppKitShell>
+          <div className="app">
+            <header className="header">
+              <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                  <div className="brand">
+                    <img src={logoSrc} alt="" className="brand-glyph" />
+                    <span className="brand-text">daman</span>
+                  </div>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                  <Tooltip.Content className="tt-content" sideOffset={6}>
+                    Slash-bonded copy-trading on arc.
+                    <Tooltip.Arrow className="tt-arrow" />
+                  </Tooltip.Content>
+                </Tooltip.Portal>
+              </Tooltip.Root>
+              <div className="header-right">
+                <a className="header-cinema-link" href={cinematicHref}>
+                  view as cinematic loop →
+                </a>
+                <ConnectButton />
+              </div>
+            </header>
+            <Hero />
+            <HomeGrid />
+            <section className="home-secondary">
+              <div className="home-secondary-h">
+                <span className="home-secondary-h-label">actions</span>
+              </div>
+              <Tabs.Root
+                value={tab}
+                onValueChange={(v) => setTab(v as Tab)}
+                activationMode="automatic"
+              >
+                <Tabs.List className="nav">
+                  {TABS.map((t) => (
+                    <Tabs.Trigger key={t.value} value={t.value}>
+                      {t.label}
+                    </Tabs.Trigger>
+                  ))}
+                </Tabs.List>
+              </Tabs.Root>
+              <main className="main">
+                {tab === 'subscribe' && <Onboarding />}
+                {tab === 'gasless' && <OnboardingGasless />}
+                {tab === 'balance' && <UnifiedBalance />}
+                {tab === 'receipts' && <Receipts />}
+                {tab === 'reputation' && <ReputationPanel />}
+              </main>
+            </section>
+            <footer className="footer">
+              slash-bonded copy-trading on arc. open standard at{' '}
+              <a href="https://github.com/damanfi/protocol">damanfi/protocol</a>.{' '}
+              <a href={cinematicHref}>cinematic loop</a>.
+            </footer>
+          </div>
+        </AppKitShell>
+      </WalletProvider>
     </Tooltip.Provider>
   );
 }
