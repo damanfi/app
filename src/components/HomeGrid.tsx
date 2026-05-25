@@ -351,7 +351,7 @@ function StatsStrip({
         muted={loading}
       />
       <Stat
-        value={stats ? `$${stats.usdc}` : loading ? '·' : '$0'}
+        value={stats ? `${stats.usdc} USDC` : loading ? '·' : '0 USDC'}
         label="USDC moved"
         muted={loading}
       />
@@ -964,22 +964,39 @@ function PanelHeader({ title, sub }: { title: string; sub: string }) {
 
 // -----------------------------------------------------------------------
 // formatting
+//
+// USDC has 6 decimals on Arc. Display as "X.XX USDC" not "$X" because the
+// suffix anchors the unit and the formatter never lies about magnitude
+// (a 0.10 USDC bond reads as "0.10 USDC", not "$0"). For amounts smaller
+// than 0.01 USDC, we widen to 4 fractional digits so the value isn't lost.
 
-function formatUsd(n: bigint): string {
-  if (n === 0n) return '$0';
-  const s = formatUnits(n, 18);
-  if (!s.includes('.')) return `$${s}`;
+function formatUsdc(n: bigint): string {
+  if (n === 0n) return '0 USDC';
+  const s = formatUnits(n, 6);
+  if (!s.includes('.')) return `${s} USDC`;
   const [whole, frac] = s.split('.');
-  const trimmed = frac.replace(/0+$/, '').slice(0, 2);
-  return trimmed.length > 0 ? `$${whole}.${trimmed}` : `$${whole}`;
+  const trimmed = frac.replace(/0+$/, '');
+  // If the value is below 0.01 USDC, keep up to 4 frac digits so it doesn't
+  // round away to "0 USDC".
+  if (whole === '0' && trimmed.length > 0 && trimmed.slice(0, 2) === '00') {
+    return `${whole}.${trimmed.slice(0, 4)} USDC`;
+  }
+  const short = trimmed.slice(0, 2);
+  return short.length > 0 ? `${whole}.${short} USDC` : `${whole} USDC`;
 }
+
+// Back-compat alias for any panels that still call the old name.
+const formatUsd = formatUsdc;
 
 function trimUsdc(raw: string): string {
   if (!/^\d+$/.test(raw)) return raw;
-  if (raw.length <= 6) return `${raw}u`;
-  const whole = raw.slice(0, -6) || '0';
-  const frac = raw.slice(-6).replace(/0+$/, '').slice(0, 2);
-  return frac ? `$${whole}.${frac}` : `$${whole}`;
+  // raw is already in 6-decimal base units; reuse the same formatter so
+  // every panel renders amounts identically.
+  try {
+    return formatUsdc(BigInt(raw));
+  } catch {
+    return `${raw} units`;
+  }
 }
 
 function prettyUsdc(raw?: string): string | undefined {
