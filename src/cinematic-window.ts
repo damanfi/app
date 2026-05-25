@@ -122,43 +122,43 @@ export const CINEMATIC_WINDOW: CinematicWindow = {
 // otherwise. Add third-party EOAs here if a recording needs them labeled.
 export const BEE_NAMES: Record<string, string> = {
   // leaders (Daman copy-trading)
-  '0x15f8a419eed9dc1e21c6bb86b06be979ad80de29': 'alpha',
-  '0xf3e21ca70e16c70eade6d6bab79b3430bc7a059e': 'bravo',
-  '0x9665f66f2e3b2ea9bcaf7ac8946e7efadfa1e042': 'charlie',
-  '0x201449346f097f59ffc4477ba748c604d3b5e548': 'delta',
-  '0x10a2464bbe51684c621089b8bc966bee58058101': 'echo',
+  '0x201f1186a0551002e995e3154390aba534ef2013': 'alpha',
+  '0x51d9c8d7bda6fa62ad2e6f51a92fccc5e012aab5': 'bravo',
+  '0xbd93960eb2b32948915535cdde294927e1070dfe': 'charlie',
+  '0x92090b3c057eeaa620d7898cd5a84a9f008c4292': 'delta',
+  '0xc3700122554da1d212e64c4a70078f89c69b0d5c': 'echo',
 
   // followers (variant v1)
-  '0xddbe6e890b27f7d651d85471f020d0ba689d3ea4': 'fol v1-1',
-  '0xfe266be61b5e54d324c436b6bc1f1197ae497572': 'fol v1-2',
-  '0x8f4097a94d01d6206104dcbb50a0986806cd7f00': 'fol v1-3',
-  '0x5d9d0634f6da050e9b1a615652ef3d615fd4ec06': 'fol v1-4',
-  '0xd3cd92607509deb79fdae6977c8bd029f5795d39': 'fol v1-5',
+  '0x625921e63bdbc8de22121589befe63f1ca690f3f': 'fol v1-1',
+  '0xf64211d8d723488f04190de4d3095bdde985b052': 'fol v1-2',
+  '0xa1b6753a049aaf16a3708f0819f89b7dcd3fe20b': 'fol v1-3',
+  '0x945e80c1bd269ddbc48eff5c5f77134b73fab7f6': 'fol v1-4',
+  '0x15d5732870756a3742dd69789c61190e706a15e2': 'fol v1-5',
 
   // followers (variant v2)
-  '0x72c54db930c1bbce7efdacb594cdbd9b304294bd': 'fol v2-1',
-  '0x3e00fd3a1467b1c7a2efeb770bf4f56ae42c505c': 'fol v2-2',
-  '0x47af15735ff3e392009a16d488039c1b88809291': 'fol v2-3',
-  '0x3a7a630179674278d48dbe672b4123ab9c0c4a8f': 'fol v2-4',
-  '0x19e1f20dc0ab815f693a0715b9d7c22c5b936f3f': 'fol v2-5',
+  '0x5d3e22f05487facaab820688cfab8e6d047e1507': 'fol v2-1',
+  '0xc2e12332a8f418f2815b2b3f93cf2303fe2335bf': 'fol v2-2',
+  '0x132306568be1e2cf0766ee97fe78aa811c43306f': 'fol v2-3',
+  '0x271e896fc06665cadcf2605c46acdbf7a2529af2': 'fol v2-4',
+  '0xbdb2316ea9ce6d45cb9629d0505b61dced94d1ba': 'fol v2-5',
 
   // followers (variant v3)
-  '0x74f587f640f00ab21c3f39862e4f96098f395657': 'fol v3-1',
-  '0x986d1b266b7dfac7eb6917bde47041e0d94e8297': 'fol v3-2',
-  '0xc57b6d3f2e356e6522d5efb5d5ab4683a1cc0a16': 'fol v3-3',
-  '0xd8df4c8f0cfa03fd0d55c07fe37ca09b198ec0ae': 'fol v3-4',
-  '0x7d5297b1b1d8c36de1eb23bb282609b27d12abd9': 'fol v3-5',
+  '0xf43e8507e38288cd8b04cf4a8523d9b80548a9f1': 'fol v3-1',
+  '0xc6f2af8ac34e5dd7d0ad9e442aa88c53841caedb': 'fol v3-2',
+  '0x6b509e719ae468985a66ffc417d0bff9b15fcfd8': 'fol v3-3',
+  '0xc80ce3efaa8932aeba61837e922a6dea0c1e2338': 'fol v3-4',
+  '0x51410a983ec0ed596a7c909fb8fe03b50bf5d5e3': 'fol v3-5',
 
   // watchdogs
-  '0x23ab129d614f239fa849bc7a540b2d5d91ffa22a': 'wd v1-1',
-  '0x1ba3a042422e5580e241c9d8036ba62da2bae3ce': 'wd v1-2',
-  '0x655bf6a320e482a9c22135f9ce102b3eba9e8748': 'wd v2',
+  '0xfc48633ff43bd1f2ebb20f1765bcb2f588aebc09': 'wd v1-1',
+  '0xfc9ec014981d7b5544bef6f426bcd317f50aae99': 'wd v1-2',
+  '0xa77c2e78090e0ecd7a43a848b87a0d53e657bb0c': 'wd v2',
 
   // arbiters
-  '0x6b50670431040aad490b643b0bdd2b8017f927c1': 'arb v1',
-  '0x9e81f22d3c0a1f135d92f9e438b956792d92189a': 'arb v2',
+  '0xeca229f8642937ad5a70ec649e4055eed172d4e5': 'arb v1',
+  '0x52160698e1737dcfac95a602943f2f001e75cf6b': 'arb v2',
 
   // relief
-  '0xd191b383ff764dca1aa0568d11c2970433f1bed6': 'relief 1',
-  '0xb590c3650183926e363159eef2ccd0153e902733': 'relief 2',
+  '0xf7191e7e932881f0b3e3ca06fee09c21e297ce6f': 'relief 1',
+  '0xc9024e0e00a18cd894fb1d6a3c16c716d98df070': 'relief 2',
 };

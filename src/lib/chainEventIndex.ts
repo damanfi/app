@@ -64,7 +64,7 @@ export async function buildEventIndex(
     }),
   ]);
 
-  const resolved: ResolvedWindow = {
+  return buildEventIndexFor({
     from_block,
     to_block,
     from_iso: window.from.iso,
@@ -72,19 +72,53 @@ export async function buildEventIndex(
     contracts: window.contracts,
     safe: window.safe,
     timelock: window.timelock,
+    prior_errors: errors,
+  });
+}
+
+// Builds the index against an already-resolved block window. The
+// cinematic uses buildEventIndex (which resolves iso anchors first); the
+// home grid uses this directly with block bounds derived from a chip
+// selection. Same downstream shape; both feed the same lenses + panels.
+export async function buildEventIndexFor(params: {
+  from_block: number;
+  to_block: number;
+  contracts: CinematicContract[];
+  safe: `0x${string}`;
+  timelock: `0x${string}`;
+  from_iso?: string;
+  to_iso?: string;
+  prior_errors?: string[];
+}): Promise<EventIndex> {
+  const errors: string[] = [...(params.prior_errors ?? [])];
+
+  const resolved: ResolvedWindow = {
+    from_block: params.from_block,
+    to_block: params.to_block,
+    from_iso: params.from_iso,
+    to_iso: params.to_iso,
+    contracts: params.contracts,
+    safe: params.safe,
+    timelock: params.timelock,
   };
 
   const events: IndexedEvent[] = [];
 
-  for (const contract of window.contracts) {
-    try {
-      const logs = await fetchLogsForContract(contract, resolved);
-      for (const log of logs) events.push(log);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`${contract.name}: ${msg}`);
-    }
-  }
+  // Fetch per-contract logs in parallel. Each contract scan is its own
+  // blockscout pagination loop; running them concurrently keeps the
+  // home grid's chip-switch responsive.
+  const results = await Promise.all(
+    params.contracts.map(async (contract) => {
+      try {
+        return { contract, logs: await fetchLogsForContract(contract, resolved) };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`${contract.name}: ${msg}`);
+        return { contract, logs: [] as IndexedEvent[] };
+      }
+    })
+  );
+  for (const r of results) for (const log of r.logs) events.push(log);
 
   events.sort((a, b) => {
     if (a.block !== b.block) return a.block - b.block;
@@ -124,6 +158,16 @@ export async function buildEventIndex(
     loaded: true,
     errors,
   };
+}
+
+// Resolves a "now minus delta" anchor to an absolute block number via
+// blockscout's getblocknobytime endpoint. Used by the home grid time
+// chips to map 1h / 24h / 7d into concrete block ranges.
+export async function getBlockAtTimestamp(
+  ts_seconds: number,
+  closest: 'before' | 'after'
+): Promise<number> {
+  return getBlockNumberByTime(ts_seconds, closest);
 }
 
 // Resolves a CinematicAnchor to an absolute block number. ISO wins when

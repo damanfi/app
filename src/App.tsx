@@ -1,15 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Leaderboard } from './components/Leaderboard';
 import { Onboarding } from './components/Onboarding';
 import { OnboardingGasless } from './components/OnboardingGasless';
 import { UnifiedBalance } from './components/UnifiedBalance';
 import { Receipts } from './components/Receipts';
 import { Hero } from './components/Hero';
+import { HomeGrid } from './components/HomeGrid';
+import { ReputationPanel } from './components/ReputationPanel';
 import { CinematicRoute } from './routes/cinematic';
+import './styles/home.css';
 
-type Tab = 'leaderboard' | 'onboarding' | 'gasless' | 'balance' | 'receipts';
+type Tab = 'subscribe' | 'gasless' | 'balance' | 'receipts' | 'reputation';
 
 // Pathname-based route detection. Pages serves the SPA from BASE_URL
 // (default /app/); /app/cinematic mounts the player. A sibling 404.html
@@ -33,12 +35,15 @@ function useCurrentRoute(): 'cinematic' | 'dashboard' {
   return route;
 }
 
+// Secondary action tabs. The home dashboard now owns the primary
+// above-the-fold surface (leaders + disputes + credit + activity); the
+// tabs below provide the action paths that don't fit the read-only grid.
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'leaderboard', label: 'leaderboard' },
-  { value: 'onboarding', label: 'subscribe' },
+  { value: 'subscribe', label: 'subscribe' },
   { value: 'gasless', label: 'gasless' },
   { value: 'balance', label: 'balance' },
   { value: 'receipts', label: 'receipts' },
+  { value: 'reputation', label: 'reputation' },
 ];
 
 /**
@@ -53,8 +58,10 @@ const TABS: { value: Tab; label: string }[] = [
  */
 export function App() {
   const route = useCurrentRoute();
-  const [tab, setTab] = useState<Tab>('leaderboard');
+  const [tab, setTab] = useState<Tab>('subscribe');
   const logoSrc = `${((import.meta as any).env?.BASE_URL ?? '/')}logo-glyph.png`;
+  const baseHref = ((import.meta as any).env?.BASE_URL ?? '/') as string;
+  const cinematicHref = `${baseHref.replace(/\/$/, '')}/cinematic`;
 
   if (route === 'cinematic') {
     return <CinematicRoute />;
@@ -74,11 +81,24 @@ export function App() {
               </Tooltip.Trigger>
               <Tooltip.Portal>
                 <Tooltip.Content className="tt-content" sideOffset={6}>
-                  Slash-bonded copy-trading on hum.
+                  Slash-bonded copy-trading on arc.
                   <Tooltip.Arrow className="tt-arrow" />
                 </Tooltip.Content>
               </Tooltip.Portal>
             </Tooltip.Root>
+            <a
+              className="header-cinema-link"
+              href={cinematicHref}
+            >
+              view as cinematic loop →
+            </a>
+          </header>
+          <Hero />
+          <HomeGrid />
+          <section className="home-secondary">
+            <div className="home-secondary-h">
+              <span className="home-secondary-h-label">actions</span>
+            </div>
             <Tabs.Root
               value={tab}
               onValueChange={(v) => setTab(v as Tab)}
@@ -92,18 +112,18 @@ export function App() {
                 ))}
               </Tabs.List>
             </Tabs.Root>
-          </header>
-          <Hero />
-          <main className="main">
-            {tab === 'leaderboard' && <Leaderboard />}
-            {tab === 'onboarding' && <Onboarding />}
-            {tab === 'gasless' && <OnboardingGasless />}
-            {tab === 'balance' && <UnifiedBalance />}
-            {tab === 'receipts' && <Receipts />}
-          </main>
+            <main className="main">
+              {tab === 'subscribe' && <Onboarding />}
+              {tab === 'gasless' && <OnboardingGasless />}
+              {tab === 'balance' && <UnifiedBalance />}
+              {tab === 'receipts' && <Receipts />}
+              {tab === 'reputation' && <ReputationPanel />}
+            </main>
+          </section>
           <footer className="footer">
-            slash-bonded copy-trading on hum. open standard at{' '}
-            <a href="https://github.com/damanfi/protocol">damanfi/protocol</a>.
+            slash-bonded copy-trading on arc. open standard at{' '}
+            <a href="https://github.com/damanfi/protocol">damanfi/protocol</a>.{' '}
+            <a href={cinematicHref}>cinematic loop</a>.
           </footer>
         </div>
       </AppKitShell>

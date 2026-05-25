@@ -128,7 +128,7 @@ export function Hero() {
   return (
     <section className="hero">
       <div className="hero-line">
-        <h1 className="hero-headline">Slash-bonded copy-trading on hum.</h1>
+        <h1 className="hero-headline">Slash-bonded copy-trading on arc.</h1>
         <Tooltip.Root>
           <Tooltip.Trigger asChild>
             <a className="hero-addr" href={explorerUrl} target="_blank" rel="noreferrer">
