@@ -1311,7 +1311,7 @@ function ActivityRow({ row }: { row: ActivityRow }) {
           )}
         </span>
         <span className="home-activity-meta mono">
-          @ {row.block}
+          #{row.block.toLocaleString()}
         </span>
       </span>
     </a>

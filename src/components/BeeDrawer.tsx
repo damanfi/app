@@ -135,7 +135,7 @@ function BeeDrawerBody({
           label="events touching bee"
         />
         <DrawerStat
-          value={summary.lastBlock > 0 ? `#${summary.lastBlock}` : '·'}
+          value={summary.lastBlock > 0 ? `#${summary.lastBlock.toLocaleString()}` : '·'}
           label="last seen"
         />
       </div>
@@ -247,7 +247,7 @@ function FeedRow({ ev }: { ev: IndexedEvent }) {
           <span className="bee-drawer-feed-amount mono">{amount}</span>
         )}
       </span>
-      <span className="bee-drawer-feed-block mono">#{ev.block}</span>
+      <span className="bee-drawer-feed-block mono">#{ev.block.toLocaleString()}</span>
     </a>
   );
 }
