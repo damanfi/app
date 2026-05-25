@@ -318,6 +318,11 @@ export type AggregateStats = {
 const VALUE_PARAM_EVENTS = new Set([
   'Transfer',
   'TradeExecuted',
+  'LeaderBondPosted',
+  'BondWithdrawn',
+  'BondSlashed',
+  'FollowerSubscribed',
+  'LoanRequested',
   'LoanSettled',
   'LoanDisbursed',
   'LoanRepaid',
@@ -325,14 +330,21 @@ const VALUE_PARAM_EVENTS = new Set([
   'BountyAccrued',
   'RefundPaid',
   'RefundIssued',
-  'BondSlashed',
 ]);
 
 export function computeAggregateStats(events: IndexedEvent[]): AggregateStats {
   let raw = 0n;
   for (const ev of events) {
     if (!ev.decoded_name || !VALUE_PARAM_EVENTS.has(ev.decoded_name)) continue;
-    const v = ev.params.amount ?? ev.params.value;
+    // Different contracts name their value field differently. Pick the first
+    // one that's a decimal string; matters for FollowerSubscribed (capital),
+    // BondSlashed (slashAmount), and the standard ERC20 Transfer (value).
+    const v =
+      ev.params.amount ??
+      ev.params.value ??
+      ev.params.capital ??
+      ev.params.slashAmount ??
+      ev.params.principal;
     if (!v || !/^\d+$/.test(v)) continue;
     try {
       raw += BigInt(v);
