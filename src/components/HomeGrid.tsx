@@ -19,7 +19,6 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { formatUnits, keccak256, toBytes, type Address } from 'viem';
 import { BEE_NAMES } from '../cinematic-window';
 import {
-  arcscanAddress,
   arcscanTx,
   buildEventIndexFor,
   computeAggregateStats,
@@ -43,6 +42,7 @@ import {
 } from '../chain';
 import { copyBondAbi } from '../abi';
 import { ActorCountStrip } from './ActorCountStrip';
+import { BeeDrawer, type BeeFocus } from './BeeDrawer';
 import {
   decodeRole,
   fetchAgentRoster,
@@ -89,6 +89,7 @@ export function HomeGrid() {
   const [loadingLeaders, setLoadingLeaders] = useState(true);
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(true);
+  const [focus, setFocus] = useState<BeeFocus | null>(null);
 
   // (1) Time-windowed event index. Refetches on chip change.
   useEffect(() => {
@@ -299,6 +300,16 @@ export function HomeGrid() {
     return m;
   }, [index]);
 
+  // Quick lookup so the participants panel can attach leader bond/tier
+  // to the BeeFocus when a leader cell is clicked. Watchdogs / arbiters
+  // / relief / followers don't have an entry and the drawer renders
+  // without the leader block.
+  const leadersByAddress = useMemo(() => {
+    const m = new Map<string, LeaderRow>();
+    for (const r of decoratedLeaders) m.set(r.address.toLowerCase(), r);
+    return m;
+  }, [decoratedLeaders]);
+
   return (
     <section className="home">
       <ChipStrip
@@ -319,6 +330,7 @@ export function HomeGrid() {
           leaders={decoratedLeaders}
           loading={loadingLeaders}
           windowId={windowId}
+          onFocus={setFocus}
         />
         <DisputesPanel index={index} loading={loadingIndex} />
         <CreditPanel index={index} loading={loadingIndex} />
@@ -327,9 +339,19 @@ export function HomeGrid() {
           loading={loadingRoster}
           activity={activityByAddress}
           windowId={windowId}
+          onFocus={setFocus}
+          leadersByAddress={leadersByAddress}
         />
         <ActivityFeed index={index} loading={loadingIndex} />
       </div>
+      <BeeDrawer
+        focus={focus}
+        index={index}
+        windowLabel={TIME_WINDOW_LABELS[windowId]}
+        onOpenChange={(o) => {
+          if (!o) setFocus(null);
+        }}
+      />
     </section>
   );
 }
@@ -479,10 +501,12 @@ function LeadersPanel({
   leaders,
   loading,
   windowId,
+  onFocus,
 }: {
   leaders: LeaderRow[];
   loading: boolean;
   windowId: TimeWindowId;
+  onFocus: (focus: BeeFocus) => void;
 }) {
   return (
     <div className="home-panel home-panel-leaders">
@@ -494,7 +518,12 @@ function LeadersPanel({
       ) : (
         <div className="home-leaders-grid">
           {leaders.map((r) => (
-            <LeaderCard key={r.address} row={r} windowId={windowId} />
+            <LeaderCard
+              key={r.address}
+              row={r}
+              windowId={windowId}
+              onFocus={onFocus}
+            />
           ))}
         </div>
       )}
@@ -505,9 +534,11 @@ function LeadersPanel({
 function LeaderCard({
   row,
   windowId,
+  onFocus,
 }: {
   row: LeaderRow;
   windowId: TimeWindowId;
+  onFocus: (focus: BeeFocus) => void;
 }) {
   const bee = BEE_NAMES[row.address.toLowerCase()];
   const tierName = TIER_LABEL[row.tier] ?? `tier ${row.tier}`;
@@ -517,11 +548,21 @@ function LeaderCard({
     ? 'unbonded'
     : 'inactive';
   return (
-    <a
+    <button
+      type="button"
       className="home-leader-card"
-      href={arcscanAddress(row.address)}
-      target="_blank"
-      rel="noreferrer"
+      onClick={() =>
+        onFocus({
+          address: row.address,
+          role: 'leader',
+          leader: {
+            tier: row.tier,
+            bondAmount: row.bondAmount,
+            claimedAum: row.claimedAum,
+            active: row.active,
+          },
+        })
+      }
     >
       <div className="home-leader-top">
         <span className="home-leader-bee">{bee ?? 'agent'}</span>
@@ -551,7 +592,7 @@ function LeaderCard({
           <span className="mono home-leader-val">{row.tradeCount}</span>
         </div>
       </div>
-    </a>
+    </button>
   );
 }
 
@@ -842,11 +883,15 @@ function ParticipantsPanel({
   loading,
   activity,
   windowId,
+  onFocus,
+  leadersByAddress,
 }: {
   roster: RosterEntry[];
   loading: boolean;
   activity: Map<string, number>;
   windowId: TimeWindowId;
+  onFocus: (focus: BeeFocus) => void;
+  leadersByAddress: Map<string, LeaderRow>;
 }) {
   const groups = useMemo(() => groupRosterByRole(roster), [roster]);
   const total = roster.length;
@@ -872,6 +917,8 @@ function ParticipantsPanel({
                 entries={arr}
                 activity={activity}
                 windowId={windowId}
+                onFocus={onFocus}
+                leadersByAddress={leadersByAddress}
               />
             );
           })}
@@ -886,11 +933,15 @@ function RoleGroup({
   entries,
   activity,
   windowId,
+  onFocus,
+  leadersByAddress,
 }: {
   role: RegistryRole;
   entries: RosterEntry[];
   activity: Map<string, number>;
   windowId: TimeWindowId;
+  onFocus: (focus: BeeFocus) => void;
+  leadersByAddress: Map<string, LeaderRow>;
 }) {
   const activeInWindow = entries.filter(
     (e) => (activity.get(e.address.toLowerCase()) ?? 0) > 0
@@ -908,7 +959,13 @@ function RoleGroup({
       </div>
       <div className="home-role-cells">
         {entries.map((e) => (
-          <RoleCell key={e.address} entry={e} activity={activity} />
+          <RoleCell
+            key={e.address}
+            entry={e}
+            activity={activity}
+            onFocus={onFocus}
+            leadersByAddress={leadersByAddress}
+          />
         ))}
       </div>
     </div>
@@ -918,23 +975,40 @@ function RoleGroup({
 function RoleCell({
   entry,
   activity,
+  onFocus,
+  leadersByAddress,
 }: {
   entry: RosterEntry;
   activity: Map<string, number>;
+  onFocus: (focus: BeeFocus) => void;
+  leadersByAddress: Map<string, LeaderRow>;
 }) {
   const bee = BEE_NAMES[entry.address.toLowerCase()];
   const txs = activity.get(entry.address.toLowerCase()) ?? 0;
   return (
-    <a
+    <button
+      type="button"
       className={`home-role-cell ${txs > 0 ? 'home-role-cell-active' : ''}`}
-      href={arcscanAddress(entry.address)}
-      target="_blank"
-      rel="noreferrer"
+      onClick={() => {
+        const leader = leadersByAddress.get(entry.address.toLowerCase());
+        onFocus({
+          address: entry.address,
+          role: entry.role,
+          leader: leader
+            ? {
+                tier: leader.tier,
+                bondAmount: leader.bondAmount,
+                claimedAum: leader.claimedAum,
+                active: leader.active,
+              }
+            : undefined,
+        });
+      }}
     >
       <span className="home-role-cell-bee">{bee ?? '·'}</span>
       <span className="home-role-cell-addr mono">{shortAddr(entry.address)}</span>
       <span className="home-role-cell-tx mono">{txs} tx</span>
-    </a>
+    </button>
   );
 }
 
