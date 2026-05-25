@@ -606,7 +606,7 @@ function LeadersPanel({
       {loading ? (
         <div className="home-empty">indexing leaders…</div>
       ) : leaders.length === 0 ? (
-        <div className="home-empty">no leaders registered yet.</div>
+        <div className="home-empty">no leaders registered yet. when a bee posts bond, its card lands here.</div>
       ) : (
         <div className="home-leaders-grid">
           {leaders.map((r) => (
@@ -708,7 +708,7 @@ function DisputesPanel({
       {loading && chains.length === 0 ? (
         <div className="home-empty">indexing disputes…</div>
       ) : chains.length === 0 ? (
-        <div className="home-empty">no disputes filed in the selected window.</div>
+        <div className="home-empty">no claims filed in this window. try widening the time chip.</div>
       ) : (
         <div className="home-disputes-scroll">
           {chains.map((c) => (
@@ -845,7 +845,7 @@ function CreditPanel({
       {loading && groups.length === 0 ? (
         <div className="home-empty">indexing credit…</div>
       ) : groups.length === 0 ? (
-        <div className="home-empty">no benevolence cycles in scope.</div>
+        <div className="home-empty">no credit cycles in this window. try widening the time chip.</div>
       ) : (
         <div className="home-credit-scroll">
           {groups.map((g) => (
@@ -996,7 +996,7 @@ function ParticipantsPanel({
       {loading && total === 0 ? (
         <div className="home-empty">reading registry…</div>
       ) : total === 0 ? (
-        <div className="home-empty">no agents on the registry yet.</div>
+        <div className="home-empty">no agents on the registry yet. agents land here on boot via DamanAgentRegistry.</div>
       ) : (
         <div className="home-roles">
           {REGISTRY_ROLE_ORDER.map((role) => {
@@ -1114,17 +1114,18 @@ function ActivityFeed({
   index: EventIndex | null;
   loading: boolean;
 }) {
-  const rows = useMemo(() => collectActivity(index), [index]);
+  const { rows, totalDecoded } = useMemo(() => collectActivity(index), [index]);
+  const subLabel =
+    totalDecoded === rows.length
+      ? `${rows.length} event${rows.length === 1 ? '' : 's'}`
+      : `${rows.length} of ${totalDecoded} events`;
   return (
     <div className="home-panel home-panel-activity">
-      <PanelHeader
-        title="activity"
-        sub={`${rows.length} event${rows.length === 1 ? '' : 's'}`}
-      />
+      <PanelHeader title="activity" sub={subLabel} />
       {loading && rows.length === 0 ? (
         <div className="home-empty">indexing activity…</div>
       ) : rows.length === 0 ? (
-        <div className="home-empty">mesh is idle.</div>
+        <div className="home-empty">no protocol activity in this window. try widening the time chip.</div>
       ) : (
         <div className="home-activity-scroll">
           {rows.map((r, i) => (
@@ -1159,16 +1160,19 @@ type ActivityRow = {
   context?: string;
 };
 
-function collectActivity(index: EventIndex | null): ActivityRow[] {
-  if (!index) return [];
+function collectActivity(
+  index: EventIndex | null
+): { rows: ActivityRow[]; totalDecoded: number } {
+  if (!index) return { rows: [], totalDecoded: 0 };
   const out: ActivityRow[] = [];
   for (const ev of index.events) {
     const r = toActivityRow(ev);
     if (r) out.push(r);
   }
-  // Most recent first; cap to 40 so the panel stays readable.
+  // Most recent first; cap to 60 so the panel stays readable but covers
+  // a wider window than the original 40-row crop.
   out.sort((a, b) => b.block - a.block);
-  return out.slice(0, 40);
+  return { rows: out.slice(0, 60), totalDecoded: out.length };
 }
 
 function toActivityRow(ev: IndexedEvent): ActivityRow | null {
