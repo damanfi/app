@@ -315,35 +315,52 @@ export type AggregateStats = {
   credCycles: number;       // loans with both settle and repay in window
 };
 
+// Every event on every indexed contract that carries a USDC value the
+// dashboard should count toward "USDC moved". Names below are the
+// canonical Solidity event names emitted by the deployed contracts
+// (verified from source, not guessed). Fees (e.g.
+// RefundProtocol.WithdrawalFeePaid) are intentionally excluded.
+//
+// Note: the indexer does NOT fetch USDC contract logs — gas-as-USDC
+// pre-deductions are not events on our protocol surface, only on the
+// USDC contract itself, and including them here would conflate fee
+// burn with protocol value flow.
 const VALUE_PARAM_EVENTS = new Set([
+  // ERC20 fallback (if any indexed contract happens to emit Transfer)
   'Transfer',
-  'TradeExecuted',
+  // CopyBond
   'LeaderBondPosted',
   'BondWithdrawn',
   'BondSlashed',
   'FollowerSubscribed',
+  'TradeExecuted',
+  // Benevolence (mesh-mutual-aid credit)
   'LoanRequested',
-  'LoanSettled',
-  'LoanDisbursed',
+  'LoanRequestedViaRelief',
   'LoanRepaid',
-  'BountyPaid',
+  // BountyAccrual
   'BountyAccrued',
-  'RefundPaid',
-  'RefundIssued',
+  'BountyClaimed',
+  // RefundProtocol (the substrate's restitution path)
+  'PaymentCreated',
+  'Withdrawal',
+  'Refund',
+  'DebtSettled',
 ]);
 
 export function computeAggregateStats(events: IndexedEvent[]): AggregateStats {
   let raw = 0n;
   for (const ev of events) {
     if (!ev.decoded_name || !VALUE_PARAM_EVENTS.has(ev.decoded_name)) continue;
-    // Different contracts name their value field differently. Pick the first
-    // one that's a decimal string; matters for FollowerSubscribed (capital),
-    // BondSlashed (slashAmount), and the standard ERC20 Transfer (value).
+    // Each contract names its USDC value differently; pick the first
+    // field that resolves to a decimal string.
     const v =
       ev.params.amount ??
       ev.params.value ??
       ev.params.capital ??
       ev.params.slashAmount ??
+      ev.params.totalAmount ??
+      ev.params.settleAmount ??
       ev.params.principal;
     if (!v || !/^\d+$/.test(v)) continue;
     try {
