@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { Leaderboard } from './components/Leaderboard';
@@ -7,8 +7,31 @@ import { OnboardingGasless } from './components/OnboardingGasless';
 import { UnifiedBalance } from './components/UnifiedBalance';
 import { Receipts } from './components/Receipts';
 import { Hero } from './components/Hero';
+import { CinematicRoute } from './routes/cinematic';
 
 type Tab = 'leaderboard' | 'onboarding' | 'gasless' | 'balance' | 'receipts';
+
+// Pathname-based route detection. Pages serves the SPA from BASE_URL
+// (default /app/); /app/cinematic mounts the player. A sibling 404.html
+// in the build output redirects any unknown sub-path back to the SPA
+// shell, which is the standard Pages SPA pattern.
+function useCurrentRoute(): 'cinematic' | 'dashboard' {
+  const base = (((import.meta as any).env?.BASE_URL ?? '/') as string)
+    .replace(/\/$/, '');
+  const read = () => {
+    const p = window.location.pathname.replace(/\/$/, '');
+    const tail = p.startsWith(base) ? p.slice(base.length) : p;
+    if (tail === '/cinematic' || tail === 'cinematic') return 'cinematic';
+    return 'dashboard';
+  };
+  const [route, setRoute] = useState<'cinematic' | 'dashboard'>(read);
+  useEffect(() => {
+    const onChange = () => setRoute(read());
+    window.addEventListener('popstate', onChange);
+    return () => window.removeEventListener('popstate', onChange);
+  }, []);
+  return route;
+}
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'leaderboard', label: 'leaderboard' },
@@ -29,8 +52,13 @@ const TABS: { value: Tab; label: string }[] = [
  * paths.
  */
 export function App() {
+  const route = useCurrentRoute();
   const [tab, setTab] = useState<Tab>('leaderboard');
   const logoSrc = `${((import.meta as any).env?.BASE_URL ?? '/')}logo-glyph.png`;
+
+  if (route === 'cinematic') {
+    return <CinematicRoute />;
+  }
 
   return (
     <Tooltip.Provider delayDuration={300}>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Daman</title>
+    <script>
+      // SPA fallback for GitHub Pages.
+      //
+      // Pages serves this file when the requested path does not match
+      // a static file in the build output. The script rewrites the
+      // unknown path into a query string and bounces to the site root
+      // (which serves the SPA shell). main.tsx reads the query on load
+      // and restores the original path via history.replaceState, so
+      // the SPA router sees /app/cinematic as if it loaded directly.
+      //
+      // Single-segment paths only; matches the cinematic route shape.
+      // See https://github.com/rafgraph/spa-github-pages for the
+      // canonical version of this pattern.
+      (function () {
+        var segmentCount = 1; // /app -> 1 segment under repo root
+        var l = window.location;
+        l.replace(
+          l.protocol +
+            '//' +
+            l.hostname +
+            (l.port ? ':' + l.port : '') +
+            l.pathname
+              .split('/')
+              .slice(0, 1 + segmentCount)
+              .join('/') +
+            '/?p=/' +
+            l.pathname
+              .slice(1)
+              .split('/')
+              .slice(segmentCount)
+              .join('/')
+              .replace(/&/g, '~and~') +
+            (l.search ? '&q=' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+            l.hash
+        );
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
