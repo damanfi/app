@@ -127,6 +127,10 @@ export function CinematicPlayer() {
               to_block: CINEMATIC_WINDOW.to.block ?? 0,
               from_iso: CINEMATIC_WINDOW.from.iso,
               to_iso: CINEMATIC_WINDOW.to.iso,
+              from_is_latest:
+                CINEMATIC_WINDOW.from.now === true && !CINEMATIC_WINDOW.from.iso,
+              to_is_latest:
+                CINEMATIC_WINDOW.to.now === true && !CINEMATIC_WINDOW.to.iso,
               contracts: CINEMATIC_WINDOW.contracts,
               safe: CINEMATIC_WINDOW.safe,
               timelock: CINEMATIC_WINDOW.timelock,
@@ -170,16 +174,21 @@ export function CinematicPlayer() {
   );
 
   if (!eventIndex) {
-    // Boot card. Operator-facing window summary: iso when present, block
-    // otherwise. Iso anchors are resolved by the indexer; before that
-    // resolves, fall back to whatever the config provides directly.
+    // Boot card. Operator-facing window summary: iso when present, the
+    // sentinel "latest" when `now: true` was used, block otherwise.
+    // The full resolution happens in the indexer; before that resolves,
+    // fall back to whatever the config provides directly.
     const fromLabel =
       CINEMATIC_WINDOW.from.iso
         ? formatIsoCompact(CINEMATIC_WINDOW.from.iso)
+        : CINEMATIC_WINDOW.from.now
+        ? 'latest'
         : `block ${CINEMATIC_WINDOW.from.block?.toLocaleString() ?? '·'}`;
     const toLabel =
       CINEMATIC_WINDOW.to.iso
         ? formatIsoCompact(CINEMATIC_WINDOW.to.iso)
+        : CINEMATIC_WINDOW.to.now
+        ? 'latest'
         : `block ${CINEMATIC_WINDOW.to.block?.toLocaleString() ?? '·'}`;
     return (
       <div className="cine-root">

@@ -1,22 +1,25 @@
 // Cinematic window configuration.
 //
 // The cinematic player walks every event emitted by the contracts listed
-// below across the inclusive window [from, to]. Each anchor accepts EITHER
-// an ISO-8601 datetime string OR an absolute block number; the indexer
-// resolves iso anchors to block numbers at mount via blockscout's
-// getblocknobytime endpoint, then continues exactly as if blocks were
-// configured directly. To change what the cinematic shows, edit this file
-// and redeploy. No URL params, no curated tx hashes, no event-level
+// below across the inclusive window [from, to]. Each anchor accepts ONE
+// of three forms: an ISO-8601 datetime string, an absolute block number,
+// or the sentinel `now: true` which resolves to the latest head block at
+// mount. The indexer resolves iso/now anchors to block numbers at mount
+// via blockscout, then continues exactly as if blocks were configured
+// directly. To change what the cinematic shows, edit this file and
+// redeploy. No URL params, no curated tx hashes, no event-level
 // selection.
 //
 // Operator usage:
 //   from: { iso: '2026-05-25T14:00:00Z' }, to: { iso: '2026-05-25T17:00:00Z' }
 //   from: { block: 43_950_000 },           to: { block: 43_965_000 }
 //   from: { iso: '2026-05-25T14:00:00Z' }, to: { block: 43_965_000 }   // mixed is fine
+//   from: { iso: '2026-05-25T00:00:00Z' }, to: { now: true }           // rolling window
 //
-// When both `iso` and `block` are present on the same anchor, `iso` wins
-// and is resolved at mount. The TitleLens displays the iso range when
-// available and falls back to the block range.
+// Precedence on a single anchor: `iso` wins over `now` wins over `block`.
+// The TitleLens displays the iso range when available, the resolved
+// block range otherwise, and tags the latest side with "(latest)" when
+// `now: true` was used.
 
 export type CinematicContract = {
   addr: `0x${string}`;
@@ -24,10 +27,12 @@ export type CinematicContract = {
   layer: 'substrate' | 'reverb-markets' | 'daman';
 };
 
-// One side of the window. Provide iso, block, or both (iso wins).
+// One side of the window. Provide iso, block, or `now: true` (iso wins,
+// then now, then block).
 export type CinematicAnchor = {
   iso?: string;
   block?: number;
+  now?: boolean;
 };
 
 export type CinematicWindow = {
@@ -40,23 +45,25 @@ export type CinematicWindow = {
 
 // Post-resolution shape carried by the in-memory event index. Lenses read
 // from this; the raw config is not exposed to them so they never have to
-// know whether the operator entered iso or block.
+// know whether the operator entered iso, block, or now.
 export type ResolvedWindow = {
   from_block: number;
   to_block: number;
   from_iso?: string;
   to_iso?: string;
+  from_is_latest?: boolean;
+  to_is_latest?: boolean;
   contracts: CinematicContract[];
   safe: `0x${string}`;
   timelock: `0x${string}`;
 };
 
 export const CINEMATIC_WINDOW: CinematicWindow = {
-  // Synthetic placeholder window. Operator overwrites these anchors once
-  // the swarm has emitted history. Iso form is the default operator
-  // interface; block form is the developer reach. Either works.
-  from: { iso: '2026-05-25T14:00:00Z' },
-  to: { iso: '2026-05-25T17:00:00Z' },
+  // Rolling window. Starts at the moment Daman went live; ends at the
+  // latest head block at view time. Reloading the cinematic recaptures
+  // everything emitted since launch, no config edits required.
+  from: { iso: '2026-05-25T00:00:00Z' },
+  to: { now: true },
 
   // The full ten-contract sweep. Order matters only for the SubstrateLens
   // rendering order; everything else groups by layer.

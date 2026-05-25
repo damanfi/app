@@ -1,0 +1,127 @@
+/* Actor-count strip. Sits directly under the home stats grid as a
+ * compact horizontal row of role-chips. Dark + amber to match the rest
+ * of the dashboard's glass-panel palette; falls below the stats strip on
+ * narrow viewports.
+ */
+
+.actor-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: stretch;
+  margin-top: var(--space-3);
+}
+
+.actor-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--glass-2);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--fg-2);
+  cursor: default;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.actor-chip:hover {
+  border-color: var(--glass-border-strong);
+  color: var(--fg-1);
+}
+
+.actor-chip-empty {
+  color: var(--fg-4);
+  border-color: rgba(58, 58, 72, 0.6);
+  background: var(--glass-1);
+}
+
+.actor-chip-empty:hover {
+  border-color: rgba(58, 58, 72, 0.8);
+  color: var(--fg-3);
+}
+
+.actor-chip-loading .actor-chip-count {
+  color: var(--fg-3);
+  animation: actor-chip-pulse 1.4s ease-in-out infinite;
+}
+
+.actor-chip-count {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand-1);
+  letter-spacing: 0.02em;
+}
+
+.actor-chip-empty .actor-chip-count {
+  color: var(--fg-4);
+}
+
+.actor-chip-label {
+  color: inherit;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+}
+
+@keyframes actor-chip-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+/* tooltip */
+
+.actor-chip-tip {
+  background: var(--bg-2);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--fg-2);
+  max-width: 280px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+  z-index: 60;
+}
+
+.actor-chip-tip-h {
+  color: var(--brand-1);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+.actor-chip-tip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.actor-chip-tip-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.actor-chip-tip-bee {
+  color: var(--fg-1);
+}
+
+.actor-chip-tip-addr {
+  color: var(--fg-3);
+  font-size: 11px;
+}
+
+.actor-chip-tip-arrow {
+  fill: var(--bg-2);
+}

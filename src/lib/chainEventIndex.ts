@@ -50,15 +50,23 @@ export async function buildEventIndex(
 ): Promise<EventIndex> {
   const errors: string[] = [];
 
-  // Resolve iso → block for either / both sides. `closest=after` for
+  // Cache the "latest head" lookup for the duration of one build so a
+  // window with `now: true` on both sides only hits the endpoint once.
+  let latestCache: Promise<number> | null = null;
+  const latest = () => {
+    if (!latestCache) latestCache = getLatestBlockNumber();
+    return latestCache;
+  };
+
+  // Resolve iso/now → block for either / both sides. `closest=after` for
   // from, `closest=before` for to so the resulting window contains every
   // event timestamped within the requested datetime range.
   const [from_block, to_block] = await Promise.all([
-    resolveAnchor(window.from, 'after').catch((e) => {
+    resolveAnchor(window.from, 'after', latest).catch((e) => {
       errors.push(`resolve from: ${e instanceof Error ? e.message : String(e)}`);
       return window.from.block ?? 0;
     }),
-    resolveAnchor(window.to, 'before').catch((e) => {
+    resolveAnchor(window.to, 'before', latest).catch((e) => {
       errors.push(`resolve to: ${e instanceof Error ? e.message : String(e)}`);
       return window.to.block ?? Number.MAX_SAFE_INTEGER;
     }),
@@ -69,6 +77,8 @@ export async function buildEventIndex(
     to_block,
     from_iso: window.from.iso,
     to_iso: window.to.iso,
+    from_is_latest: window.from.now === true && !window.from.iso,
+    to_is_latest: window.to.now === true && !window.to.iso,
     contracts: window.contracts,
     safe: window.safe,
     timelock: window.timelock,
@@ -88,6 +98,8 @@ export async function buildEventIndexFor(params: {
   timelock: `0x${string}`;
   from_iso?: string;
   to_iso?: string;
+  from_is_latest?: boolean;
+  to_is_latest?: boolean;
   prior_errors?: string[];
 }): Promise<EventIndex> {
   const errors: string[] = [...(params.prior_errors ?? [])];
@@ -97,6 +109,8 @@ export async function buildEventIndexFor(params: {
     to_block: params.to_block,
     from_iso: params.from_iso,
     to_iso: params.to_iso,
+    from_is_latest: params.from_is_latest,
+    to_is_latest: params.to_is_latest,
     contracts: params.contracts,
     safe: params.safe,
     timelock: params.timelock,
@@ -170,14 +184,18 @@ export async function getBlockAtTimestamp(
   return getBlockNumberByTime(ts_seconds, closest);
 }
 
-// Resolves a CinematicAnchor to an absolute block number. ISO wins when
-// both fields are set; if only `block` is set, it returns directly. The
-// `closest` direction chooses which side of the timestamp to round to;
-// pass 'after' for from-anchors, 'before' for to-anchors so the resulting
-// window covers every event in the requested datetime range.
+// Resolves a CinematicAnchor to an absolute block number. Precedence:
+// iso > now > block. ISO is resolved via blockscout's getblocknobytime.
+// `now: true` is resolved to the current head block; the caller passes
+// a memoized fetcher so a window with `now` on both sides only fires the
+// head lookup once. The `closest` direction chooses which side of the
+// timestamp to round to; pass 'after' for from-anchors, 'before' for
+// to-anchors so the resulting window covers every event in the
+// requested datetime range.
 async function resolveAnchor(
   anchor: CinematicAnchor,
-  closest: 'before' | 'after'
+  closest: 'before' | 'after',
+  latest: () => Promise<number>
 ): Promise<number> {
   if (anchor.iso) {
     const ts = Math.floor(new Date(anchor.iso).getTime() / 1000);
@@ -186,10 +204,30 @@ async function resolveAnchor(
     }
     return await getBlockNumberByTime(ts, closest);
   }
+  if (anchor.now === true) {
+    return await latest();
+  }
   if (typeof anchor.block === 'number' && Number.isFinite(anchor.block)) {
     return anchor.block;
   }
-  throw new Error('anchor has neither iso nor block');
+  throw new Error('anchor has neither iso, now, nor block');
+}
+
+// Fetches the current head block from blockscout. Uses the v2 blocks
+// listing because it is the same surface the indexer already speaks;
+// avoids pulling in a viem client purely for one eth_blockNumber call.
+async function getLatestBlockNumber(): Promise<number> {
+  const url = `${BLOCKSCOUT_BASE}/blocks?type=block&items_count=1`;
+  const res = await fetch(url, { headers: { accept: 'application/json' } });
+  if (!res.ok) throw new Error(`latest-block http ${res.status}`);
+  const body = await res.json();
+  const items = Array.isArray(body?.items) ? body.items : [];
+  const raw = items[0]?.height ?? items[0]?.number;
+  const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
+  if (!Number.isFinite(n) || n < 0) {
+    throw new Error(`latest-block bad response: ${JSON.stringify(body).slice(0, 200)}`);
+  }
+  return n;
 }
 
 async function getBlockNumberByTime(

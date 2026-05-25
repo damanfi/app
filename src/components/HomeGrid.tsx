@@ -42,6 +42,7 @@ import {
   getLogsPaged,
 } from '../chain';
 import { copyBondAbi } from '../abi';
+import { ActorCountStrip } from './ActorCountStrip';
 import {
   decodeRole,
   fetchAgentRoster,
@@ -312,6 +313,7 @@ export function HomeGrid() {
         rosterCount={roster.length}
         loadingRoster={loadingRoster}
       />
+      <ActorCountStrip fromBlock={index?.window.from_block ?? null} toBlock={index?.window.to_block ?? null} />
       <div className="home-grid">
         <LeadersPanel
           leaders={decoratedLeaders}
