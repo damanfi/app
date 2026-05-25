@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { type Address, formatUnits } from 'viem';
+import { type Address, formatUnits, keccak256, toBytes } from 'viem';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import {
+  AGENT_REGISTRY_ADDRESS,
+  AGENT_REGISTRY_DEPLOY_BLOCK,
   COPY_BOND_ADDRESS,
   COPY_BOND_DEPLOY_BLOCK,
   REPUTATION_REGISTRY_DEPLOY_BLOCK,
@@ -28,6 +30,8 @@ const REPUTATION_REGISTRY_ADDRESS = ((import.meta as any).env
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
+const LEADER_ROLE = keccak256(toBytes('leader'));
+
 const reputationUpdatedAbi = {
   type: 'event',
   name: 'ReputationUpdated',
@@ -35,6 +39,15 @@ const reputationUpdatedAbi = {
     { name: 'agent', type: 'address', indexed: true },
     { name: 'score', type: 'int256', indexed: false },
     { name: 'upheld', type: 'bool', indexed: false },
+  ],
+} as const;
+
+const agentRegisteredAbi = {
+  type: 'event',
+  name: 'AgentRegistered',
+  inputs: [
+    { name: 'agent', type: 'address', indexed: true },
+    { name: 'role', type: 'bytes32', indexed: false },
   ],
 } as const;
 
@@ -57,6 +70,30 @@ export function Leaderboard() {
         for (const log of logs) {
           const leader = (log as any).args?.leader as Address | undefined;
           if (leader) seen.add(leader.toLowerCase() as Address);
+        }
+
+        // Leaders can register on the agent registry before posting a copy
+        // bond. Surface them too so the dashboard reflects on-chain truth
+        // rather than only the bonded subset. The getLeader call below
+        // returns the zero struct for unbonded leaders; we fall back to
+        // the event address in that case.
+        if (AGENT_REGISTRY_ADDRESS.toLowerCase() !== ZERO_ADDRESS) {
+          try {
+            const agentLogs = await getLogsPaged({
+              address: AGENT_REGISTRY_ADDRESS,
+              event: agentRegisteredAbi as any,
+              fromBlock: AGENT_REGISTRY_DEPLOY_BLOCK,
+            });
+            for (const log of agentLogs) {
+              const agent = (log as any).args?.agent as Address | undefined;
+              const role = (log as any).args?.role as `0x${string}` | undefined;
+              if (!agent || !role) continue;
+              if (role.toLowerCase() !== LEADER_ROLE.toLowerCase()) continue;
+              seen.add(agent.toLowerCase() as Address);
+            }
+          } catch {
+            // agent registry is an optional surface; ok to omit
+          }
         }
 
         const trends: Record<string, number[]> = {};
@@ -88,8 +125,13 @@ export function Leaderboard() {
             functionName: 'getLeader',
             args: [leader],
           })) as any;
+          // Unbonded leaders (registered on the agent registry but not on
+          // the copy bond) return the zero struct here. Use the registry
+          // address as the canonical address in that case.
+          const addr =
+            data.addr && data.addr.toLowerCase() !== ZERO_ADDRESS ? data.addr : leader;
           results.push({
-            address: data.addr,
+            address: addr,
             tier: Number(data.tier),
             bondAmount: data.bondAmount,
             claimedAum: data.claimedAum,
@@ -118,9 +160,9 @@ export function Leaderboard() {
       <div className="panel">
         <h2>leaders</h2>
         <div className="empty">
-          <div className="empty-headline">no leaders bonded yet.</div>
+          <div className="empty-headline">no leaders registered yet.</div>
           <div className="empty-detail">
-            be the first by going to the subscribe tab. once a leader posts a bond, this view
+            be the first by going to the subscribe tab. once a leader registers, this view
             populates with on-chain state in real time.
           </div>
         </div>
@@ -163,9 +205,13 @@ export function Leaderboard() {
                 <Sparkline trend={r.trend} />
               </td>
               <td>
-                <span className={`badge ${r.active ? 'active' : 'inactive'}`}>
-                  {r.active ? 'active' : 'inactive'}
-                </span>
+                {r.active ? (
+                  <span className="badge active">active</span>
+                ) : r.bondAmount === 0n ? (
+                  <span className="badge inactive">unbonded</span>
+                ) : (
+                  <span className="badge inactive">inactive</span>
+                )}
               </td>
             </tr>
           ))}

@@ -24,6 +24,13 @@ export const REPUTATION_REGISTRY_DEPLOY_BLOCK: bigint = BigInt(
   env.VITE_REPUTATION_REGISTRY_DEPLOY_BLOCK ?? '0'
 );
 
+export const AGENT_REGISTRY_ADDRESS = ((env.VITE_AGENT_REGISTRY ??
+  '0x4b214C6CDCcE4b00e692BE44AD19d652C7F9FB6a') as Address);
+
+export const AGENT_REGISTRY_DEPLOY_BLOCK: bigint = BigInt(
+  env.VITE_AGENT_REGISTRY_DEPLOY_BLOCK ?? env.VITE_COPY_BOND_DEPLOY_BLOCK ?? '0'
+);
+
 // Arc testnet caps eth_getLogs at 10,000 blocks per call. Other
 // providers vary; the env override lets a deployer dial this down
 // without code edits.
