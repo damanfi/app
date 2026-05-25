@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CINEMATIC_WINDOW } from '../cinematic-window';
 import {
   buildEventIndex,
+  computeAggregateStats,
+  formatIsoCompact,
   type EventIndex,
 } from '../lib/chainEventIndex';
 import { TitleLens } from './lenses/TitleLens';
@@ -93,7 +95,8 @@ const LENSES: LensSpec[] = [
     caption: (idx) => {
       const eoas = idx.participants.size;
       const txs = new Set(idx.events.map((e) => e.tx_hash)).size;
-      return `${eoas} agents. ${txs} transactions. Complete dispute resolutions and benevolence cycles closed. All verifiable on testnet.arcscan.app.`;
+      const stats = computeAggregateStats(idx.events);
+      return `${eoas} agents. ${txs} transactions. $${stats.usdcMoved} USDC moved. ${stats.disputeChains} complete dispute resolutions. ${stats.credCycles} benevolence cycles closed. All verifiable on testnet.arcscan.app.`;
     },
   },
 ];
@@ -119,7 +122,15 @@ export function CinematicPlayer() {
         // still cycles and the captions still read truthfully (zeros).
         if (!cancelled) {
           setEventIndex({
-            window: CINEMATIC_WINDOW,
+            window: {
+              from_block: CINEMATIC_WINDOW.from.block ?? 0,
+              to_block: CINEMATIC_WINDOW.to.block ?? 0,
+              from_iso: CINEMATIC_WINDOW.from.iso,
+              to_iso: CINEMATIC_WINDOW.to.iso,
+              contracts: CINEMATIC_WINDOW.contracts,
+              safe: CINEMATIC_WINDOW.safe,
+              timelock: CINEMATIC_WINDOW.timelock,
+            },
             events: [],
             by_contract: new Map(),
             by_event_name: new Map(),
@@ -159,13 +170,23 @@ export function CinematicPlayer() {
   );
 
   if (!eventIndex) {
+    // Boot card. Operator-facing window summary: iso when present, block
+    // otherwise. Iso anchors are resolved by the indexer; before that
+    // resolves, fall back to whatever the config provides directly.
+    const fromLabel =
+      CINEMATIC_WINDOW.from.iso
+        ? formatIsoCompact(CINEMATIC_WINDOW.from.iso)
+        : `block ${CINEMATIC_WINDOW.from.block?.toLocaleString() ?? '·'}`;
+    const toLabel =
+      CINEMATIC_WINDOW.to.iso
+        ? formatIsoCompact(CINEMATIC_WINDOW.to.iso)
+        : `block ${CINEMATIC_WINDOW.to.block?.toLocaleString() ?? '·'}`;
     return (
       <div className="cine-root">
         <div className="cine-boot">
-          <div className="cine-boot-line">indexing block range</div>
+          <div className="cine-boot-line">indexing window</div>
           <div className="cine-boot-meta">
-            block {CINEMATIC_WINDOW.from_block.toLocaleString()} to block{' '}
-            {CINEMATIC_WINDOW.to_block.toLocaleString()}
+            {fromLabel} to {toLabel}
           </div>
         </div>
       </div>

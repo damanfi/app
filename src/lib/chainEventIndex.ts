@@ -1,15 +1,24 @@
 // In-memory event index for the cinematic window.
 //
-// At mount, the cinematic player calls buildEventIndex() once. It
-// batch-fetches every log emitted by the configured contracts inside
-// [from_block, to_block] via the blockscout v2 REST API, normalizes
-// each into an IndexedEvent, and groups them by contract + by topic
-// for the lenses to walk. NO RPC subscriptions, NO polling. Static
-// snapshot of the window, played back.
+// At mount, the cinematic player calls buildEventIndex() once. It:
+//   1. Resolves any iso-anchored sides of the window to absolute block
+//      numbers via blockscout's getblocknobytime endpoint.
+//   2. Batch-fetches every log emitted by the configured contracts inside
+//      [from_block, to_block] via the blockscout v2 REST API.
+//   3. Normalizes each into an IndexedEvent, groups by contract + topic,
+//      hands back the index for the lenses to walk.
+// NO RPC subscriptions, NO polling. Static snapshot of the window, played
+// back.
 
-import type { CinematicContract, CinematicWindow } from '../cinematic-window';
+import type {
+  CinematicAnchor,
+  CinematicContract,
+  CinematicWindow,
+  ResolvedWindow,
+} from '../cinematic-window';
 
 const BLOCKSCOUT_BASE = 'https://testnet.arcscan.app/api/v2';
+const BLOCKSCOUT_V1 = 'https://testnet.arcscan.app/api';
 
 export type IndexedEvent = {
   contract: CinematicContract;
@@ -17,48 +26,59 @@ export type IndexedEvent = {
   tx_hash: string;
   log_index: number;
   topic0: string | null;
-  // Human-readable decoded name if blockscout decoded the log. Falls back
-  // to the raw topic0 when the contract is unverified or the event isn't
-  // in the local ABI cache.
   decoded_name: string | null;
-  // Decoded parameters keyed by name. Empty object when decoded_name is
-  // null. Values are strings (blockscout returns them serialized).
   params: Record<string, string>;
-  // Pass-through topics + data so lenses can recover anything the
-  // decoded layer drops. Useful for matching events by raw signature.
   topics: string[];
   data: string;
-  // Best-effort tx-sender; populated lazily via tx_hash lookup when a
-  // lens needs the originating EOA and blockscout did not include it
-  // in the log payload.
   from?: string;
 };
 
 export type EventIndex = {
-  window: CinematicWindow;
+  window: ResolvedWindow;
   events: IndexedEvent[];
   by_contract: Map<string, IndexedEvent[]>;
   by_event_name: Map<string, IndexedEvent[]>;
-  // Best-effort: every EOA that appears as msg.sender on any tx that
-  // emitted at least one log in the window. Populated when the player
-  // expands tx-hash → from-address for the ParticipantsLens.
   participants: Set<string>;
   loaded: boolean;
   errors: string[];
 };
 
-// Builds the in-memory event index. Each contract's logs are fetched
-// over potentially-paginated blockscout pages; the function returns
-// once all pages for every contract have been collected.
+// Builds the in-memory event index. Resolves any iso anchors to block
+// numbers first, then walks blockscout for every contract in scope.
 export async function buildEventIndex(
   window: CinematicWindow
 ): Promise<EventIndex> {
-  const events: IndexedEvent[] = [];
   const errors: string[] = [];
+
+  // Resolve iso → block for either / both sides. `closest=after` for
+  // from, `closest=before` for to so the resulting window contains every
+  // event timestamped within the requested datetime range.
+  const [from_block, to_block] = await Promise.all([
+    resolveAnchor(window.from, 'after').catch((e) => {
+      errors.push(`resolve from: ${e instanceof Error ? e.message : String(e)}`);
+      return window.from.block ?? 0;
+    }),
+    resolveAnchor(window.to, 'before').catch((e) => {
+      errors.push(`resolve to: ${e instanceof Error ? e.message : String(e)}`);
+      return window.to.block ?? Number.MAX_SAFE_INTEGER;
+    }),
+  ]);
+
+  const resolved: ResolvedWindow = {
+    from_block,
+    to_block,
+    from_iso: window.from.iso,
+    to_iso: window.to.iso,
+    contracts: window.contracts,
+    safe: window.safe,
+    timelock: window.timelock,
+  };
+
+  const events: IndexedEvent[] = [];
 
   for (const contract of window.contracts) {
     try {
-      const logs = await fetchLogsForContract(contract, window);
+      const logs = await fetchLogsForContract(contract, resolved);
       for (const log of logs) events.push(log);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -66,7 +86,6 @@ export async function buildEventIndex(
     }
   }
 
-  // Sort chronologically by (block, log_index).
   events.sort((a, b) => {
     if (a.block !== b.block) return a.block - b.block;
     return a.log_index - b.log_index;
@@ -87,9 +106,6 @@ export async function buildEventIndex(
   }
 
   const participants = new Set<string>();
-  // Populate participants from any param that looks like an EOA. The
-  // ParticipantsLens enriches further with tx-from lookups when it
-  // needs sender attribution; this seed set is enough for the count.
   for (const ev of events) {
     for (const value of Object.values(ev.params)) {
       if (looksLikeAddress(value)) participants.add(value.toLowerCase());
@@ -100,7 +116,7 @@ export async function buildEventIndex(
   }
 
   return {
-    window,
+    window: resolved,
     events,
     by_contract,
     by_event_name,
@@ -110,16 +126,53 @@ export async function buildEventIndex(
   };
 }
 
+// Resolves a CinematicAnchor to an absolute block number. ISO wins when
+// both fields are set; if only `block` is set, it returns directly. The
+// `closest` direction chooses which side of the timestamp to round to;
+// pass 'after' for from-anchors, 'before' for to-anchors so the resulting
+// window covers every event in the requested datetime range.
+async function resolveAnchor(
+  anchor: CinematicAnchor,
+  closest: 'before' | 'after'
+): Promise<number> {
+  if (anchor.iso) {
+    const ts = Math.floor(new Date(anchor.iso).getTime() / 1000);
+    if (!Number.isFinite(ts) || ts <= 0) {
+      throw new Error(`invalid iso: ${anchor.iso}`);
+    }
+    return await getBlockNumberByTime(ts, closest);
+  }
+  if (typeof anchor.block === 'number' && Number.isFinite(anchor.block)) {
+    return anchor.block;
+  }
+  throw new Error('anchor has neither iso nor block');
+}
+
+async function getBlockNumberByTime(
+  timestamp: number,
+  closest: 'before' | 'after'
+): Promise<number> {
+  const url = `${BLOCKSCOUT_V1}?module=block&action=getblocknobytime&timestamp=${timestamp}&closest=${closest}`;
+  const res = await fetch(url, { headers: { accept: 'application/json' } });
+  if (!res.ok) throw new Error(`getblocknobytime http ${res.status}`);
+  const body = await res.json();
+  const raw = body?.result?.blockNumber ?? body?.result;
+  const n = typeof raw === 'string' ? parseInt(raw, 10) : Number(raw);
+  if (!Number.isFinite(n) || n < 0) {
+    throw new Error(`getblocknobytime bad response: ${JSON.stringify(body).slice(0, 200)}`);
+  }
+  return n;
+}
+
 async function fetchLogsForContract(
   contract: CinematicContract,
-  window: CinematicWindow
+  window: ResolvedWindow
 ): Promise<IndexedEvent[]> {
   const out: IndexedEvent[] = [];
-  // Blockscout v2 returns the contract's logs in reverse-chronological
-  // order, paginated via next_page_params. The endpoint does NOT take
-  // from_block / to_block query params; we paginate, client-side filter
-  // each item against the configured window, and short-circuit once we
-  // walk past the window's lower bound.
+  // Blockscout v2 returns logs in reverse-chronological order, paginated
+  // via next_page_params. The endpoint does not accept from_block /
+  // to_block; we paginate, client-side filter each item to the window,
+  // and short-circuit once we walk past the lower bound.
   let next: Record<string, string> | null = null;
   const safety = 200; // hard cap on page iterations per contract
   for (let i = 0; i < safety; i++) {
@@ -177,9 +230,6 @@ async function fetchLogsForContract(
       });
     }
 
-    // Pagination is reverse-chronological; once any item in the page
-    // dipped below from_block we won't see anything in-window on
-    // subsequent pages either, so stop.
     if (walkedBeyondWindow) break;
     next = body?.next_page_params ?? null;
     if (!next || Object.keys(next).length === 0) break;
@@ -202,4 +252,110 @@ export function arcscanAddress(a: string): string {
 
 export function arcscanTx(h: string): string {
   return `https://testnet.arcscan.app/tx/${h}`;
+}
+
+// UI helpers used by lenses that prefer iso display over raw block numbers.
+export function formatIsoCompact(iso: string): string {
+  // "2026-05-25T14:00:00Z" → "2026-05-25 14:00 UTC"
+  const m = iso.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  if (!m) return iso;
+  return `${m[1]} ${m[2]} UTC`;
+}
+
+// Aggregate stats derived from the index. Shared by the AggregateLens and
+// the player's caption strip so the two surfaces never disagree.
+
+export type AggregateStats = {
+  usdcMoved: string;        // pretty-printed, no $ prefix
+  disputeChains: number;    // fully-resolved dispute chains in window
+  credCycles: number;       // loans with both settle and repay in window
+};
+
+const VALUE_PARAM_EVENTS = new Set([
+  'Transfer',
+  'TradeExecuted',
+  'LoanSettled',
+  'LoanDisbursed',
+  'LoanRepaid',
+  'BountyPaid',
+  'BountyAccrued',
+  'RefundPaid',
+  'RefundIssued',
+  'BondSlashed',
+]);
+
+export function computeAggregateStats(events: IndexedEvent[]): AggregateStats {
+  let raw = 0n;
+  for (const ev of events) {
+    if (!ev.decoded_name || !VALUE_PARAM_EVENTS.has(ev.decoded_name)) continue;
+    const v = ev.params.amount ?? ev.params.value;
+    if (!v || !/^\d+$/.test(v)) continue;
+    try {
+      raw += BigInt(v);
+    } catch {
+      // skip
+    }
+  }
+
+  return {
+    usdcMoved: formatUsdc(raw),
+    disputeChains: countDisputeChains(events),
+    credCycles: countCreditCycles(events),
+  };
+}
+
+function countDisputeChains(events: IndexedEvent[]): number {
+  const ruled = new Map<string, { upheld: boolean; slashed: boolean }>();
+  for (const ev of events) {
+    if (!ev.decoded_name) continue;
+    const cid = (ev.params.claimId ?? ev.params.claim_id ?? '') as string;
+    if (!cid) continue;
+    const cur = ruled.get(cid) ?? { upheld: false, slashed: false };
+    if (ev.decoded_name === 'ArbiterRuled' || ev.decoded_name === 'Ruled') {
+      cur.upheld = ev.params.upheld === 'true';
+    }
+    if (ev.decoded_name === 'BondSlashed' || ev.decoded_name === 'Slashed') {
+      cur.slashed = true;
+    }
+    ruled.set(cid, cur);
+  }
+  let n = 0;
+  for (const v of ruled.values()) {
+    if (v.upheld && v.slashed) n++;
+    else if (!v.upheld) n++;
+  }
+  return n;
+}
+
+function countCreditCycles(events: IndexedEvent[]): number {
+  type State = { settled: boolean; repaid: boolean };
+  const loans = new Map<string, State>();
+  for (const ev of events) {
+    if (!ev.decoded_name) continue;
+    const lid = (ev.params.loanId ?? ev.params.requestId ?? '') as string;
+    if (!lid) continue;
+    const cur = loans.get(lid) ?? { settled: false, repaid: false };
+    if (ev.decoded_name === 'LoanSettled' || ev.decoded_name === 'LoanDisbursed') {
+      cur.settled = true;
+    }
+    if (ev.decoded_name === 'LoanRepaid' || ev.decoded_name === 'Repaid') {
+      cur.repaid = true;
+    }
+    loans.set(lid, cur);
+  }
+  let n = 0;
+  for (const v of loans.values()) if (v.settled && v.repaid) n++;
+  return n;
+}
+
+function formatUsdc(v: bigint): string {
+  // 6-decimal USDC.
+  if (v === 0n) return '0';
+  const s = v.toString();
+  if (s.length <= 6) {
+    return `0.${s.padStart(6, '0').replace(/0+$/, '').slice(0, 2) || '00'}`;
+  }
+  const whole = s.slice(0, -6);
+  const frac = s.slice(-6).replace(/0+$/, '').slice(0, 2);
+  return frac ? `${whole}.${frac}` : whole;
 }
