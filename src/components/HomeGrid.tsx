@@ -903,27 +903,38 @@ type CreditGroup = {
   borrower?: string;
   relief?: string;
   amount?: string;
-  status: 'requested' | 'disbursed' | 'repaid';
+  status: 'requested' | 'repaid';
   firstBlock: number;
   lastTx?: string;
 };
 
 function collectCreditGroups(index: EventIndex | null): CreditGroup[] {
   if (!index) return [];
+  // Benevolence events carry no loanId — group by borrower address.
+  // LoanRequested / LoanRequestedViaRelief mark the open; LoanRepaid closes.
   const map = new Map<string, CreditGroup>();
   for (const ev of index.events) {
     const n = ev.decoded_name ?? '';
-    const lid = (
-      ev.params.loanId ??
-      ev.params.requestId ??
-      ev.params.id ??
-      ''
-    ) as string;
-    if (!lid) continue;
-    let g = map.get(lid);
+    const isRequest =
+      n === 'LoanRequested' ||
+      n === 'LoanRequest' ||
+      n === 'RequestLoan';
+    const isP2P =
+      n === 'LoanRequestedViaRelief' ||
+      n === 'LoanRequestedViaSignature' ||
+      n === 'LoanRequestedWithSignature' ||
+      n === 'LoanRelayed';
+    const isRepay = n === 'LoanRepaid' || n === 'Repaid';
+    if (!isRequest && !isP2P && !isRepay) continue;
+
+    const borrower = (ev.params.borrower ?? ev.from ?? '') as string;
+    if (!borrower) continue;
+    const key = borrower.toLowerCase();
+
+    let g = map.get(key);
     if (!g) {
-      g = { loanId: lid, status: 'requested', firstBlock: ev.block };
-      map.set(lid, g);
+      g = { loanId: borrower, status: 'requested', firstBlock: ev.block };
+      map.set(key, g);
     } else if (ev.block < g.firstBlock) {
       g.firstBlock = ev.block;
     }
@@ -931,28 +942,17 @@ function collectCreditGroups(index: EventIndex | null): CreditGroup[] {
     if (ev.params.amount && /^\d+$/.test(ev.params.amount)) {
       g.amount = trimUsdc(ev.params.amount);
     }
-    if (
-      n === 'LoanRequested' ||
-      n === 'LoanRequest' ||
-      n === 'RequestLoan'
-    ) {
-      g.borrower = ev.params.borrower ?? g.borrower;
+    if (isRequest) {
+      g.borrower = borrower;
     }
-    if (
-      n === 'LoanRequestedViaSignature' ||
-      n === 'LoanRequestedWithSignature' ||
-      n === 'LoanRelayed'
-    ) {
-      g.borrower = ev.params.borrower ?? g.borrower;
-      g.relief = ev.params.submitter ?? g.relief;
+    if (isP2P) {
+      g.borrower = borrower;
+      g.relief =
+        (ev.params.relayer ?? ev.params.submitter ?? g.relief) as string | undefined;
     }
-    if (n === 'LoanSettled' || n === 'LoanDisbursed') {
-      g.status = 'disbursed';
-      g.borrower = ev.params.borrower ?? g.borrower;
-    }
-    if (n === 'LoanRepaid' || n === 'Repaid') {
+    if (isRepay) {
       g.status = 'repaid';
-      g.borrower = ev.params.borrower ?? g.borrower;
+      g.borrower = borrower;
     }
   }
   return [...map.values()].sort((a, b) => b.firstBlock - a.firstBlock);
@@ -962,7 +962,9 @@ function CreditRow({ group }: { group: CreditGroup }) {
   return (
     <div className={`home-loan home-loan-${group.status}`}>
       <div className="home-loan-h">
-        <span className="home-loan-id mono">#{group.loanId.slice(0, 12)}</span>
+        <span className="home-loan-id">
+          {BEE_NAMES[group.loanId.toLowerCase()] ?? shortAddr(group.loanId)}
+        </span>
         <span className={`home-pill home-pill-${group.status}`}>{group.status}</span>
       </div>
       <div className="home-loan-row">
