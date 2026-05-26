@@ -59,10 +59,12 @@ export type ResolvedWindow = {
 };
 
 export const CINEMATIC_WINDOW: CinematicWindow = {
-  // Rolling window. Starts at the moment Daman went live; ends at the
-  // latest head block at view time. Reloading the cinematic recaptures
-  // everything emitted since launch, no config edits required.
-  from: { iso: '2026-05-25T00:00:00Z' },
+  // Rolling window. Starts the day before the substrate seed (so the
+  // UniverseRegistry's AssetAdded events at block 43836047 / 2026-05-24
+  // 12:48 UTC are in scope) and ends at the latest head block at view
+  // time. Reloading the cinematic recaptures everything emitted since
+  // launch, no config edits required.
+  from: { iso: '2026-05-24T00:00:00Z' },
   to: { now: true },
 
   // The full ten-contract sweep. Order matters only for the SubstrateLens

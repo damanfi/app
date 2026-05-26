@@ -1,20 +1,32 @@
 import { useEffect, useState } from 'react';
-import { type Address, formatUnits } from 'viem';
+import { type Address, formatUnits, keccak256, toBytes } from 'viem';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import {
   COPY_BOND_ADDRESS,
   COPY_BOND_DEPLOY_BLOCK,
-  REPUTATION_REGISTRY_DEPLOY_BLOCK,
+  AGENT_REGISTRY_ADDRESS,
+  AGENT_REGISTRY_DEPLOY_BLOCK,
   getClient,
   getLogsPaged,
 } from '../chain';
 import { copyBondAbi } from '../abi';
 
-const REPUTATION_REGISTRY_ADDRESS = ((import.meta as any).env
-  ?.VITE_REPUTATION_REGISTRY ??
-  '0x0000000000000000000000000000000000000000') as Address;
-
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const WATCHDOG_ROLE = keccak256(toBytes('watchdog')).toLowerCase();
+
+// Counts bees registered as watchdog on DamanAgentRegistry. We can't
+// read DamanReputationRegistry's ReputationUpdated for this — those
+// only fire after an arbiter rules a claim, so the count stays 0 until
+// the swarm has produced a full dispute chain. AgentRegistered fires at
+// bee boot, so the count reflects reality from spawn time.
+const agentRegisteredAbi = {
+  type: 'event',
+  name: 'AgentRegistered',
+  inputs: [
+    { name: 'agent', type: 'address', indexed: true },
+    { name: 'role', type: 'bytes32', indexed: false },
+  ],
+} as const;
 
 const reputationUpdatedAbi = {
   type: 'event',
@@ -25,6 +37,7 @@ const reputationUpdatedAbi = {
     { name: 'upheld', type: 'bool', indexed: false },
   ],
 } as const;
+void reputationUpdatedAbi;
 
 type Metrics = {
   tvlDisplay: string;
@@ -88,16 +101,19 @@ export function Hero() {
         }
 
         let watchdogs = new Set<string>();
-        if (REPUTATION_REGISTRY_ADDRESS.toLowerCase() !== ZERO_ADDRESS) {
+        if (AGENT_REGISTRY_ADDRESS.toLowerCase() !== ZERO_ADDRESS) {
           try {
-            const repLogs = await getLogsPaged({
-              address: REPUTATION_REGISTRY_ADDRESS,
-              event: reputationUpdatedAbi as any,
-              fromBlock: REPUTATION_REGISTRY_DEPLOY_BLOCK,
+            const agentLogs = await getLogsPaged({
+              address: AGENT_REGISTRY_ADDRESS,
+              event: agentRegisteredAbi as any,
+              fromBlock: AGENT_REGISTRY_DEPLOY_BLOCK,
             });
-            for (const log of repLogs) {
+            for (const log of agentLogs) {
               const agent = (log as any).args?.agent as Address | undefined;
-              if (agent) watchdogs.add(agent.toLowerCase());
+              const role = (log as any).args?.role as `0x${string}` | undefined;
+              if (!agent || !role) continue;
+              if (role.toLowerCase() !== WATCHDOG_ROLE) continue;
+              watchdogs.add(agent.toLowerCase());
             }
           } catch {
             // RPC hiccup; keep watchdogs at 0
@@ -106,7 +122,9 @@ export function Hero() {
 
         if (!cancelled) {
           setM({
-            tvlDisplay: formatUnits(tvl, 18),
+            // USDC is 6-decimal; format the bond total in USDC units so
+            // the hero metric matches the rest of the dashboard.
+            tvlDisplay: formatUnits(tvl, 6),
             leaderCount: leaders.size,
             watchdogCount: watchdogs.size,
             loaded: true,
