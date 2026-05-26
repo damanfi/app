@@ -439,23 +439,29 @@ function countDisputeChains(events: IndexedEvent[]): number {
 }
 
 function countCreditCycles(events: IndexedEvent[]): number {
-  type State = { settled: boolean; repaid: boolean };
-  const loans = new Map<string, State>();
+  // The Benevolence contract emits LoanRequested / LoanRequestedViaRelief
+  // when a loan is disbursed, and LoanRepaid when it's paid back. There is
+  // no separate "settled" event. Count each LoanRepaid as one closed cycle.
+  type State = { requested: boolean; repaid: number };
+  const borrowers = new Map<string, State>();
   for (const ev of events) {
     if (!ev.decoded_name) continue;
-    const lid = (ev.params.loanId ?? ev.params.requestId ?? '') as string;
-    if (!lid) continue;
-    const cur = loans.get(lid) ?? { settled: false, repaid: false };
-    if (ev.decoded_name === 'LoanSettled' || ev.decoded_name === 'LoanDisbursed') {
-      cur.settled = true;
+    const borrower = (ev.params.borrower ?? '') as string;
+    if (!borrower) continue;
+    const cur = borrowers.get(borrower) ?? { requested: false, repaid: 0 };
+    if (
+      ev.decoded_name === 'LoanRequested' ||
+      ev.decoded_name === 'LoanRequestedViaRelief'
+    ) {
+      cur.requested = true;
     }
     if (ev.decoded_name === 'LoanRepaid' || ev.decoded_name === 'Repaid') {
-      cur.repaid = true;
+      cur.repaid += 1;
     }
-    loans.set(lid, cur);
+    borrowers.set(borrower, cur);
   }
   let n = 0;
-  for (const v of loans.values()) if (v.settled && v.repaid) n++;
+  for (const v of borrowers.values()) if (v.requested && v.repaid > 0) n += v.repaid;
   return n;
 }
 

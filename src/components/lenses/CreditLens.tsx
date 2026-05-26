@@ -34,6 +34,7 @@ const REQUEST_EVENTS = new Set([
   'RequestLoan',
 ]);
 const P2P_EVENTS = new Set([
+  'LoanRequestedViaRelief',
   'LoanRequestedViaSignature',
   'LoanRequestedWithSignature',
   'LoanRelayed',
@@ -47,10 +48,10 @@ export function CreditLens({ index }: Props) {
   for (const ev of index.events) {
     const move = toMove(ev);
     if (!move) continue;
-    const loanId = (ev.params.loanId ??
-      ev.params.requestId ??
-      ev.params.id ??
-      `${ev.tx_hash}-${ev.log_index}`) as string;
+    // Benevolence events carry no loanId — group by borrower address so
+    // all of a borrower's requests, p2p-submits, and repayments appear
+    // as one connected block.
+    const loanId = move.borrower || `${ev.tx_hash}-${ev.log_index}`;
     if (!groups.has(loanId)) groups.set(loanId, { loanId, moves: [] });
     groups.get(loanId)!.moves.push(move);
   }
@@ -77,8 +78,9 @@ export function CreditLens({ index }: Props) {
           {ordered.map((g) => (
             <div key={g.loanId} className="lens-loan">
               <div className="lens-loan-h">
-                <span>loan</span>
-                <span className="mono">#{g.loanId.slice(0, 12)}</span>
+                <span className="lens-bee">
+                  {BEE_NAMES[g.loanId.toLowerCase()] ?? shortAddr(g.loanId)}
+                </span>
               </div>
               <div className="lens-loan-moves">
                 {g.moves.map((m, i) => (
@@ -144,7 +146,7 @@ function toMove(ev: IndexedEvent): Move | null {
       block: ev.block,
       tx_hash: ev.tx_hash,
       borrower: ev.params.borrower ?? '',
-      submitter: ev.params.submitter ?? ev.from ?? '',
+      submitter: ev.params.relayer ?? ev.params.submitter ?? ev.from ?? '',
       amount: prettyUsdc(ev.params.amount),
     };
   }
