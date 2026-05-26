@@ -67,6 +67,13 @@ const TIER_LABEL = ['retail', 'mid', 'institutional'];
 // once per block without hammering the blockscout stats endpoint.
 const LIVE_POLL_MS = 12_000;
 
+// Event-index refresh cadence. 20s is short enough that a steady swarm
+// (mints landing every block or two) reaches the feed within a sub-minute
+// window, and long enough that the pagination loop across every indexed
+// contract doesn't stack onto itself. Pauses when the tab is hidden and
+// resumes on visibility.
+const INDEX_REFRESH_MS = 20_000;
+
 type LiveBlock = {
   head: number | null;
   fetchedAt: number;
@@ -132,11 +139,19 @@ export function HomeGrid() {
   const [focus, setFocus] = useState<BeeFocus | null>(null);
   const liveBlock = useLiveBlock();
 
-  // (1) Time-windowed event index. Refetches on chip change.
+  // (1) Time-windowed event index. Refetches on chip change and on a
+  // ~20s wall-clock interval while the tab is visible so the activity
+  // feed and stat strip mature with the swarm instead of freezing at
+  // mount. Pauses when the tab is hidden; resumes on visibility.
   useEffect(() => {
     let cancelled = false;
+    let timer: number | null = null;
+    let inFlight = false;
     setLoadingIndex(true);
-    (async () => {
+
+    const fetchOnce = async (markLoading: boolean) => {
+      if (inFlight) return;
+      inFlight = true;
       try {
         const resolved = await resolveHomeWindow(windowId);
         const idx = await buildEventIndexFor({
@@ -166,11 +181,37 @@ export function HomeGrid() {
           });
         }
       } finally {
-        if (!cancelled) setLoadingIndex(false);
+        inFlight = false;
+        if (!cancelled && markLoading) setLoadingIndex(false);
       }
-    })();
+    };
+
+    const schedule = () => {
+      if (cancelled) return;
+      if (document.visibilityState === 'visible') {
+        timer = window.setTimeout(async () => {
+          await fetchOnce(false);
+          schedule();
+        }, INDEX_REFRESH_MS);
+      } else {
+        // Resume polling when the tab comes back into view.
+        const onVis = () => {
+          if (document.visibilityState === 'visible') {
+            document.removeEventListener('visibilitychange', onVis);
+            fetchOnce(false).then(schedule);
+          }
+        };
+        document.addEventListener('visibilitychange', onVis);
+      }
+    };
+
+    // First fetch shows the loading spinner; subsequent timed refreshes
+    // update silently so the panels don't pulse every 20 seconds.
+    fetchOnce(true).then(schedule);
+
     return () => {
       cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
     };
   }, [windowId]);
 
