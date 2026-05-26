@@ -34,12 +34,18 @@ export type ResolvedHomeWindow = {
 // same epoch, so using the copy-bond deploy as the all-time floor is
 // accurate enough for the home grid's "all" chip. If the env override is
 // missing the value drops to zero and the indexer reads from genesis.
+// All-time floor for the chip strip. We want this to be the EARLIEST
+// deploy block across every contract the dashboard indexes, not just
+// CopyBond — the UniverseRegistry seed events are at block 43836047,
+// 88 blocks before CopyBond. Hardcoded fallback `43800000` is known to
+// be safely below every deployed contract on the Arc testnet substrate
+// while staying close enough that pagination doesn't have to walk
+// forever. Operator can tighten via VITE_HOME_FLOOR_BLOCK if needed.
 const DEPLOY_BLOCK_FLOOR = (() => {
   const env = (import.meta as any).env ?? {};
   const raw =
     env.VITE_HOME_FLOOR_BLOCK ??
-    env.VITE_COPY_BOND_DEPLOY_BLOCK ??
-    '0';
+    '43800000';
   const n = Number.parseInt(String(raw), 10);
   return Number.isFinite(n) && n > 0 ? n : 0;
 })();
